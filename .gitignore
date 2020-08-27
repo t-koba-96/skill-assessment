@@ -8,6 +8,7 @@
 *.ipynb
 !Demo.ipynb
 __pycache__/
+cookie
 
 data/BEST/features/*
 data/BEST/videos/*
