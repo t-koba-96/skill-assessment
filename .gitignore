@@ -19,3 +19,6 @@ checkpoints/*
 
 args/*
 !args/template.yaml
+
+scripts/*
+!scripts/template.sh
