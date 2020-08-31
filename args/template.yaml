@@ -39,6 +39,6 @@ start_epoch : 0                              # start epoch for training
 
 # ============================ Monitor Configs ===============================
 
-print_freq : 1                               # train console print frequency (iter)
-eval_freq : 10                                # validation frequency (epoch)
-ckpt_freq : 10                                # save checkpoint frequency (epoch)
+print_freq : 5                               # train console print frequency (iter)
+eval_freq : 10                               # validation frequency (epoch)
+ckpt_freq : 10                               # save checkpoint frequency (epoch)

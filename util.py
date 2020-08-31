@@ -33,7 +33,7 @@ def make_dirs(args, opts, train_txt, val_txt, savedir):
     root_path = os.path.join(args.data_path, opts.dataset, 'features', opts.task)
     writedir = os.path.join(args.writer_path, savedir)
     ckptdir = os.path.join(args.ckpt_path, savedir)
-    dir_list = [writedir,ckptdir]
+    dir_list = [writedir, ckptdir]
     for dir in dir_list:
         if os.path.exists(dir):
             shutil.rmtree(dir)

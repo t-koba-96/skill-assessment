@@ -6,7 +6,6 @@
 .ipynb_checkpoints
 .ipynb_checkpoints/*
 *.ipynb
-!Demo.ipynb
 __pycache__/
 cookie
 
@@ -20,5 +19,3 @@ checkpoints/*
 args/*
 !args/template.yaml
 
-scripts/*
-!scripts/template.sh

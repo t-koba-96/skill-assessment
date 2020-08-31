@@ -24,8 +24,9 @@ def get_arguments():
     parser.add_argument('arg', type=str, help='arguments file name')
     parser.add_argument('dataset', type=str, help='choose dataset("EPIC-Skills" or "BEST")')
     parser.add_argument('task', type=str, help='choose task(e.g. "drawing" for EPIC-Skills, "origami" for BEST)')
+    parser.add_argument('--lap', type=str, default= '1', help='train lap count(to divide file for same yaml)')
     parser.add_argument('--split', type=str, default= '1', help='for EPIC-Skills')
-    parser.add_argument('--device', type=str, default= [0], help='choose device')
+    parser.add_argument('--cuda', type=str, default= [0], help='choose cuda num')
     return parser.parse_args()
 
 
@@ -39,8 +40,8 @@ def main():
     args = Dict(yaml.safe_load(open(os.path.join('args',opts.arg+'.yaml'))))
     print(('\n''[Options]\n''{0}\n''\n'
            '[Arguements]\n''{1}\n''\n'.format(opts, args)))
-    opts.device = list(map(str,opts.device))
-    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(opts.device)
+    opts.cuda = list(map(str,opts.cuda))
+    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(opts.cuda)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -48,18 +49,18 @@ def main():
     if opts.dataset == "BEST":
         train_txt = "train.txt"
         val_txt = "test.txt"
-        savedir = os.path.join(opts.dataset, opts.task, opts.arg)
+        savedir = os.path.join(opts.dataset, opts.task, opts.arg, "lap_"+opts.lap)
     elif opts.dataset == "EPIC-Skills":
         train_txt = "train_split" + opts.split + ".txt"
         val_txt = "test_split" + opts.split + ".txt"
-        savedir = os.path.join(opts.dataset, opts.task, opts.arg, opts.split)
+        savedir = os.path.join(opts.dataset, opts.task, opts.arg, opts.split, "lap_"+opts.lap)
     train_list, val_list, feat_path, writer, ckptdir\
                     = util.make_dirs(args, opts, train_txt, val_txt, savedir)
 
 
     # loading model
     # attention branch
-    if args.rank_aware_loss:
+    if args.disparity_loss and args.rank_aware_loss:
         num_attention_branches = 2
         models = {'pos': None, 'neg': None}
     else:
@@ -202,8 +203,8 @@ def train_without_uniform(train_loader, models, criterion, optimizer, epoch, shu
         # record losses
         av_meters['ranking_losses'].update(ranking_loss.item(), input1.size(0))
         if args.diversity_loss:
-            av_meters['diversity_losses'].update(div_loss_att1.item() + div_loss_att2.item(),
-                                                input1.size(0)*2)
+            av_meters['diversity_losses'].update(args.lambda_param*(div_loss_att1.item()+div_loss_att2.item()),
+                                                input1.size(0))
         av_meters['phase0_loss'].update(all_losses.data.item(), input1.size(0))
         av_meters['losses'].update(all_losses.data.item(), input1.size(0))
         av_meters['acc'].update(prec, input1.size(0))
@@ -329,10 +330,10 @@ def train_with_uniform(train_loader, models, model_uniform, criterion, optimizer
         # record losses
         av_meters['ranking_losses'].update(ranking_loss.item(), input1.size(0)*len(models.keys()))
         av_meters['ranking_losses_uniform'].update(ranking_loss_uniform.item(), input1.size(0))
-        av_meters['disparity_losses'].update(disparity_loss.item(), input1.size(0*len(models.keys())))
+        av_meters['disparity_losses'].update(disparity_loss.item(), input1.size(0)*len(models.keys()))
         if args.diversity_loss:
-            av_meters['diversity_losses'].update(div_loss_att1.item() + div_loss_att2.item(),
-                                                input1.size(0)*2*len(models.keys()))
+            av_meters['diversity_losses'].update(args.lambda_param*(div_loss_att1.item()+div_loss_att2.item()),
+                                                input1.size(0)*len(models.keys()))
         if args.rank_aware_loss:
             av_meters['rank_aware_losses'].update(rank_aware_loss.item(), input1.size(0))
         av_meters['losses'].update(all_losses.data.item(), input1.size(0))
@@ -405,9 +406,10 @@ def validate(val_loader, models, criterion, epoch, log = True):
         prec, cor = util.accuracy(output1_all, output2_all)
 
         # record losses
-        av_meters['ranking_losses'].update(ranking_loss.item(), input1.size(0))
+        av_meters['ranking_losses'].update(ranking_loss.item(), input1.size(0)*len(models.keys()))
         if args.diversity_loss:
-            av_meters['diversity_losses'].update(div_loss_att1.item() + div_loss_att2.item(), input1.size(0)*2)
+            av_meters['diversity_losses'].update(args.lambda_param*(div_loss_att1.item()+div_loss_att2.item()),
+                                                 input1.size(0)*len(models.keys()))
         av_meters['losses'].update(all_losses.data.item(), input1.size(0))
         av_meters['acc'].update(prec, input1.size(0))
         av_meters['correct'].update(cor)
@@ -468,6 +470,8 @@ def tensorboard_log_with_uniform(av_meters, mode, epoch):
     writer.add_scalar(mode+'/ranking_loss_uniform', av_meters['ranking_losses_uniform'].avg, epoch)
     writer.add_scalar(mode+'/acc_uniform', av_meters['acc_uniform'].avg, epoch)
     writer.add_scalar(mode+'/rank_aware_loss', av_meters['rank_aware_losses'].avg, epoch)
+    writer.add_scalar(mode+'/phase0_loss', av_meters['phase0_loss'].avg, epoch)
+    writer.add_scalar(mode+'/phase1_loss', av_meters['phase1_loss'].avg, epoch)
 
 
 
