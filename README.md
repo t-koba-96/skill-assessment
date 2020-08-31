@@ -18,12 +18,12 @@ We also include the EPIC-Skills training and testing pair files in the same form
 
 ## Train
 
-For training each tasks independently use main.py as:
+For training each task independently use main.py as:
 
 ```python main.py [arg_file] [dataset] [task] [--lap [lap_count]] [--split [split for EPIC-Skills]] [--cuda [gpu_num]]```
 
 For training together use train.sh as:
 
-```bash train.sh [arg_file] [dataset] [task] [lap_count] [--split(-s) [split for EPIC-Skills]] [--cuda(-c) [gpu_num]]```
+```bash train.sh [arg_file] [dataset] [lap_count] [--split(-s) [split for EPIC-Skills]] [--cuda(-c) [gpu_num]]```
 
 Use Help option (--help) for more info.
