@@ -67,11 +67,11 @@ def main():
         num_attention_branches = 1
         models = {'att': None}
     for k in models.keys():
-        models[k] = RAAN(args.num_samples, args.attention, args.num_filters)
+        models[k] = RAAN(args)
         models[k] = models[k].to(device)
     # uniform branch
     if args.disparity_loss:
-        model_uniform = RAAN(args.num_samples, False, 1)
+        model_uniform = RAAN(args, uniform=True)
         model_uniform = model_uniform.to(device)
 
 
@@ -272,11 +272,11 @@ def train_with_uniform(train_loader, models, model_uniform, criterion, optimizer
         for k in models.keys():
             ranking_loss += criterion(output1[k], output2[k], target)
             disparity_loss += loss.multi_rank_loss(all_output1[k], all_output2[k], output1_uniform,
-                                                output2_uniform, target, args.m2, device)
+                                                output2_uniform, target, args.m2, device, args.disparity_loss)
         ranking_loss_uniform += criterion(output1_uniform, output2_uniform, target)
         if args.rank_aware_loss:
             rank_aware_loss += loss.multi_rank_loss(all_output1['pos'], all_output2['neg'], output1_uniform,
-                                              output2_uniform, target, args.m3, device)
+                                                output2_uniform, target, args.m3, device, args.rank_aware_loss)
 
         if args.diversity_loss:
             div_loss_att1, div_loss_att2 = 0, 0

@@ -1,21 +1,26 @@
-*.*~
-*.tar.gz
-*.pyc
-
-.DS_Store
+# files
 .ipynb_checkpoints
-.ipynb_checkpoints/*
-*.ipynb
-__pycache__/
-cookie
+__pycache__
+.DS_Store
 
+# args
+args/*
+!args/template.yaml
+
+# checkpoints
+checkpoints/* 
+
+# data
 data/BEST/features/*
 data/BEST/videos/*
 data/EPIC-Skills/features/*
 
+# runs
 runs/*
-checkpoints/*
 
-args/*
-!args/template.yaml
+# jupyter notebooks
+*.ipynb
+!Test.ipynb
 
+# gitkeep
+!.gitkeep

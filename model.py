@@ -1,15 +1,28 @@
 import torch
+import copy
 from torch import nn
+import torch.nn.functional
 
 class RAAN(nn.Module):
-    def __init__(self, num_samples, attention, num_filters=3, input_size=1024, fc_output=256):
+    def __init__(self, args, input_size=1024, fc_output=256, uniform=False):
         super(RAAN, self).__init__()
-        self.num_samples = num_samples
-        self.attention = attention
-        self.num_filters = num_filters
-        self.input_size = input_size
-        self.fc_output = fc_output
+        if not uniform:
+            self.attention = args.attention
+            self.num_filters = args.num_filters
+        else:
+            self.attention = False
+            self.num_filters = 1
 
+        if args.temporal == "TCN":
+            self.input_size = args.num_f_maps
+        else:
+            self.input_size = input_size
+
+        self.num_samples = args.num_samples
+        self.temporal = args.temporal
+        self.fc_output = fc_output
+        self.temporal = args.temporal
+        self.tcn = SingleStageTCN(args, input_size)
         self._prepare_raan_model()
 
     def _prepare_raan_model(self):
@@ -28,7 +41,11 @@ class RAAN(nn.Module):
             nn.Tanh())
 
     def forward(self, input):
-        input = input.view(-1, self.num_samples, self.input_size)
+        #input = input.view(-1, self.num_samples, self.input_size)
+        if self.temporal == "TCN":
+            #mask = torch.ones(input.size(0), 1, self.num_samples)
+            #input = self.tcn(input, mask)
+            input = self.tcn(input)
         if self.attention:
             att_list = []
             # input into each attention filter
@@ -51,3 +68,39 @@ class RAAN(nn.Module):
         # all_outputs : batch * filter
         # all_atts : batch * samples * filter * 1
         return all_outputs, all_atts
+
+
+
+
+
+# TCN
+class SingleStageTCN(nn.Module):
+    def __init__(self, args, features_dim):
+        super(SingleStageTCN, self).__init__()
+        self.conv_1x1 = nn.Conv1d(features_dim, args.num_f_maps, 1)
+        self.layers = nn.ModuleList([copy.deepcopy(DilatedResidualLayer(2 ** i, args.num_f_maps, args.num_f_maps)) for i in range(args.num_layers)])
+
+    #def forward(self, x, mask):
+    def forward(self, x):
+        out = self.conv_1x1(x.permute(0,2,1))
+        for layer in self.layers:
+            #out = layer(out, mask)
+            out = layer(out)
+        #output = (out * mask).permute(0,2,1)
+        output = out.permute(0,2,1)
+        return output
+
+class DilatedResidualLayer(nn.Module):
+    def __init__(self, dilation, in_channels, out_channels):
+        super(DilatedResidualLayer, self).__init__()
+        self.conv_dilated = nn.Conv1d(in_channels, out_channels, 3, padding=dilation, dilation=dilation)
+        self.conv_1x1 = nn.Conv1d(out_channels, out_channels, 1)
+        self.dropout = nn.Dropout()
+
+    #def forward(self, x, mask):
+    def forward(self, x):
+        out = torch.nn.functional.relu(self.conv_dilated(x))
+        out = self.conv_1x1(out)
+        out = self.dropout(out)
+        #return (x + out) * mask
+        return (x + out) 

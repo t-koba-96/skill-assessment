@@ -14,12 +14,19 @@ num_samples : 400                            # input features to model
 attention : True                             # use attention or not
 num_filters : 3                              # filters of attention layer
 diversity_loss : True                        # use attention loss (diversity loss or not)
-disparity_loss : True                        # use uniform (use disparity loss or not)
-rank_aware_loss : True                       # use pos neg attention (use rank aware loss or not)
+disparity_loss : v1                          # use uniform(disparity loss : v1, v2 or False)
+rank_aware_loss : v1                         # use pos neg attention(rank aware loss : v1, v2 or False)
 lambda_param : 0.1                           # weight of diversity loss
 m1 : 1.0                                     # margin for ranking loss
 m2 : 0.05                                    # margin for disparity loss
 m3 : 0.15                                    # margin for rank aware loss
+
+
+# ============================= Temporal Model ================================
+
+temporal : False                             # temporal model (TCN available)
+num_layers: 10                               # layer for each tcn stage
+num_f_maps: 1024                             # feature output
 
 
 # =========================== Learning Configs ===============================
