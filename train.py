@@ -4,12 +4,10 @@ import torch
 import time
 import os
 
-import util
-import loss
-
-from util import AverageMeter
-from dataset import SkillDataSet
-from model import RAAN
+from main import loss, util
+from main.util import AverageMeter
+from main.dataset import SkillDataSet
+from main.model import RAAN
 
 from addict import Dict
 
