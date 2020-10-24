@@ -31,8 +31,7 @@ def get_arguments():
 
 def main():
     # args
-    global args, best_prec, writer, device, start_time
-    best_prec = 0
+    global args, writer, device, start_time
     start_time = time.time()
     opts = get_arguments()
     args = Dict(yaml.safe_load(open(os.path.join('args',opts.arg+'.yaml'))))
@@ -113,10 +112,14 @@ def main():
 
 
     ###  epochs  ###
-    if args.evaluate:
-        validate(val_loader, models, criterion, 0)
-        print('\n')
+    validate(val_loader, models, criterion, 0)
+    print("\n")
+    early_stop = earlyStopping(args.earlystopping)
+    best_prec = early_stop._score
+    val_num = 0
+    stop_count = 0
     phase = 0
+
     for epoch in range(args.start_epoch, args.epochs):
         # train
         if args.disparity_loss:
@@ -127,25 +130,37 @@ def main():
             train_without_uniform(train_loader, models, criterion, optimizer, epoch)
         print('\n')
 
-        # validate , save
-        validated = False
+        # valid
         if (epoch + 1) % args.eval_freq == 0 or epoch == args.epochs - 1:
-            prec, validated = validate(val_loader, models, criterion, epoch+1)
+            # validation
+            val_num += 1
+            prec = validate(val_loader, models, criterion, epoch+1)
             is_best = prec > best_prec
             best_prec = max(prec, best_prec)
-        if (epoch + 1) % args.ckpt_freq == 0 or epoch == args.epochs - 1:
-            if not validated:
-                prec, validated = validate(val_loader, models, criterion, epoch+1, False)
-                is_best = prec > best_prec
-                best_prec = max(prec, best_prec)
+
+            # ckpt dict
             checkpoint_dict = {'epoch': epoch + 1, 'best_prec': best_prec}
             for k in models.keys():
-                checkpoint_dict['state_dict_' + k] = models[k].state_dict(),
+                checkpoint_dict['state_dict_' + k] = models[k].state_dict()
             if args.disparity_loss:
-                checkpoint_dict['state_dict_uniform'] = model_uniform.state_dict(),
-            util.save_checkpoint(checkpoint_dict, ckptdir, epoch + 1, prec, is_best)
-        if validated:
-            print('\n')
+                checkpoint_dict['state_dict_uniform'] = model_uniform.state_dict()
+
+            # save model
+            # if ckpt_freq
+            if (val_num) % args.ckpt_freq == 0 or epoch == args.epochs - 1:
+                util.save_checkpoint(checkpoint_dict, ckptdir, epoch + 1, prec, ckpt=True, is_best=is_best)
+            # not ckpt_freq but has best_score
+            elif is_best:
+                util.save_checkpoint(checkpoint_dict, ckptdir, epoch + 1, prec, ckpt=False, is_best=is_best)
+            
+            # early stop
+            end_run = early_stop.validate(prec)
+            if end_run:
+                print("Valid score did not improve for {} rounds ... earlystopping\n".format(args.earlystopping))
+                writer.close()
+                return
+
+
     writer.close()
 
 
@@ -420,7 +435,28 @@ def validate(val_loader, models, criterion, epoch, log = True):
     if log:
         tensorboard_log(av_meters, 'val', epoch)
     
-    return av_meters['acc'].avg, True
+    return av_meters['acc'].avg
+
+
+
+class earlyStopping():
+   def __init__(self, patience):
+       self._step = 0
+       self._score = 0
+       self.patience = patience
+
+   def validate(self, score):
+       if self._score > score:
+           self._step += 1
+           if self._step == self.patience:
+               return True
+       else:
+           self._step = 0
+           self._score = score
+       print("Earlystopcount {}".format(self._step)) 
+       print("\n")
+       return False
+
 
 
 def console_log_train_batch(av_meters, epoch, total_epoch, iter, 
