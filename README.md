@@ -1,29 +1,93 @@
-# Rank-aware Attention Network
-Rank-aware Attention Network from 'The Pros and Cons: Rank-aware Temporal Attention for Skill Determination in Long Videos'.
+# Skill Assessment for long range videos
 
-## BEST Dataset
-### Videos
-The Bristol Everyday Skill Tasks (BEST) Dataset can be downloaded using `python utils/download_videos.py data/BEST/BEST.csv <download_dir> --trim`
+## Data  
 
-The `--trim` flag extracts the part of the original video used in training/testing i.e. removing title sequences or unrelated tasks preceeding the start of the relevant task.
+### Dataset
 
-### Features
-The extracted i3d features for the BEST tasks and the EPIC-Skills tasks can be downloaded using `bash utils/download_features.sh`
+- [BEST Dataset](./data/BEST) - The Bristol Everyday Skill Tasks Dataset. Includes 5 tasks -> (apply_eyeliner, braid_hair, origami, scrambled_eggs, tie_tie) 
 
-### Training/Test Splits
-The split of training and test videos can be found under `data/BEST/splits/<task_name>/<train|test>_vid_list.txt`. The files containing the annotated pairs used for training and testing can be found at `data/BEST/splits/<task_name>/<train|test>.txt`. 
+- [EPIC-Skills](./data/EPIC-Skills) - Epic skills Dataset. Includes 4 tasks -> (chopstick_using, dough_rolling, drawing, surgery) 
 
-We also include the EPIC-Skills training and testing pair files in the same format under `data/EPIC-Skills/splits/<task_name>/<train|test>_split<split_num>.txt`
+### Video Download
+
+Only BEST Dataset available. 
+
+```
+cd data
+python download/download_videos.py BEST/BEST.csv <download_dir> --trim 
+```
+ 
+--trim makes the video trimmed to the part which is only used as the dataset(No background sequenes).
+
+### Feature Download
+
+Extracted i3d features for both BEST Dataset and EPIC-Skills .
+
+```
+cd data
+bash download/download_features.sh 
+```
+
+###  Splits  
+
+- [BEST Dataset](./data/BEST)
+  - [data/BEST/splits/<task_name>/<train|test>_vid_list.txt] -> Train and test(valid) splits for each task.
+  - [data/BEST/splits/<task_name>/<train|test>.txt] -> Video pairs for prediction. 
+
+- [EPIC-Skills](./data/EPIC-Skills)
+  - [data/EPIC-Skills/splits/<task_name>/<train|test>_split<split_num>.txt] -> Video pairs for each split is divided into files. 
 
 
 ## Train
 
-For training each task independently use main.py as:
+### Args
 
-```python main.py [arg_file] [dataset] [task] [--lap [lap_count]] [--split [split for EPIC-Skills]] [--cuda [gpu_num]]```
+- Args for training are writen in yaml file. Default args are in [template.yaml](./args/template.yaml).  
+- Make a new yaml file in the args directory to train on your on settings.  
+- [arg_file] for training will be the name before .yaml.   
+(For example, [arg_file] for template.yaml will be template)
 
-For training together use train.sh as:
 
-```bash train.sh [arg_file] [dataset] [lap_count] [--split(-s) [split for EPIC-Skills]] [--cuda(-c) [gpu_num]]```
+### Train each task
+
+For training each task independently use [train.py](train.py) as:
+
+```
+python train.py [arg_file] [dataset] [task] [--lap [lap_count]] [--split [split for EPIC-Skills]] [--cuda [gpu_num]]  
+```  
+
+### Train all task
+
+For training all tasks together use [train_all.sh](train_all.sh) as:
+
+```
+bash train_all.sh [arg_file] [dataset] [lap_count] [--split(-s) [split for EPIC-Skills]] [--cuda(-c) [gpu_num]]
+```
 
 Use Help option (--help) for more info.
+
+
+### Checkpoints
+
+- Model weights  
+  - For default, trained model weights are saved to [checkpoints](./checkpoints)
+  - Change the save directory if you want by changing the ckpt_path in [arg_file](./args/template.yaml)
+  - The best score is saved as (best_score_ ... .ckpt).
+
+- Tensorboard logs
+  - For default, tensorboard logs are saved to [runs](./runs)
+  - Change the log directory if you want by changing the writer_path in [arg_file](./args/template.yaml)
+
+  (Private note : when starting tensorboard log on lab server)
+  ```
+  tensorboard --logdir runs --port 8888 --bind_all
+  ```
+
+
+## Evaluate  
+
+.To do  
+
+
+## References  
+'The Pros and Cons: Rank-aware Temporal Attention for Skill Determination in Long Videos'

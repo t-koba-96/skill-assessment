@@ -3,7 +3,7 @@
 
 # ============================ Path Configs ===============================
 
-data_path: "../../local/dataset/skill"       # data path (load data)
+data_path: "./data"       # data path (load data)
 ckpt_path : "./checkpoints"                  # checkpoint path (save model weight)
 writer_path : "./runs"                       # tensorboard path (save tensorboard)
 

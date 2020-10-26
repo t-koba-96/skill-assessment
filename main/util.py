@@ -1,16 +1,12 @@
 import os
 import shutil
 import torch
-import glob
-
-from torch.utils.tensorboard import SummaryWriter
-
 
 
 def make_dirs(args, opts, train_txt, val_txt, savedir):
     train_list = os.path.join(args.data_path, opts.dataset, 'splits', opts.task, train_txt)
-    val_list = os.path.join(args.data_path, opts.dataset, 'splits', opts.task, val_txt)
-    root_path = os.path.join(args.data_path, opts.dataset, 'features', opts.task)
+    valid_list = os.path.join(args.data_path, opts.dataset, 'splits', opts.task, val_txt)
+    feature_path = os.path.join(args.data_path, opts.dataset, 'features', opts.task)
     writedir = os.path.join(args.writer_path, savedir)
     ckptdir = os.path.join(args.ckpt_path, savedir)
     dir_list = [writedir, ckptdir]
@@ -18,21 +14,8 @@ def make_dirs(args, opts, train_txt, val_txt, savedir):
         if os.path.exists(dir):
             shutil.rmtree(dir)
         os.makedirs(dir)
-    writer = SummaryWriter(writedir)
-    return train_list, val_list, root_path, writer, ckptdir
-
-
-def save_checkpoint(state, file_path, epoch, score, ckpt=True, is_best= True):
-    if ckpt:
-        savefile = os.path.join(file_path, "epoch_{:04d}_acc_{:.4f}.ckpt".format(epoch, score))
-        torch.save(state, savefile)
-        print(('Saving checkpoint file ... epoch_{:04d}_acc_{:.4f}.ckpt'.format(epoch, score)))
-    if is_best:
-        if glob.glob(os.path.join(file_path, 'best_score*')):
-            os.remove(glob.glob(os.path.join(file_path, 'best_score*'))[0])
-        best_name = os.path.join(file_path, "best_score_epoch_{:04d}_acc_{:.4f}.ckpt".format(epoch, score))
-        torch.save(state, best_name)
-        print(('Saving checkpoint file ... best_score_epoch_{:04d}_acc_{:.4f}.ckpt'.format(epoch, score)))
+    paths = {'train_list': train_list, 'valid_list': valid_list, 'feature_path': feature_path, 'writedir': writedir, 'ckptdir': ckptdir}
+    return paths
 
 
 def accuracy(output1, output2):
