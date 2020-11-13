@@ -5,7 +5,11 @@ __pycache__
 
 # args
 args/*
-!args/template.yaml
+!args/origin.yaml
+!args/tcn.yaml
+
+# ckpt
+ckpt/* 
 
 # checkpoints
 checkpoints/* 

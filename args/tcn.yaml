@@ -3,9 +3,9 @@
 
 # ============================ Path Configs ===============================
 
-data_path: "./data"       # data path (load data)
-ckpt_path : "./checkpoints"                  # checkpoint path (save model weight)
-writer_path : "./runs"                       # tensorboard path (save tensorboard)
+data_path: "../../local/dataset/skill"       # data path (changed to my setting, default : "./data")
+ckpt_path : "./ckpt/models"                  # checkpoint path (save model weight)
+writer_path : "./ckpt/logs"                       # tensorboard path (save tensorboard)
 
 
 # ============================= Model Configs ================================
@@ -24,23 +24,22 @@ m3 : 0.15                                    # margin for rank aware loss
 
 # ============================= Temporal Model ================================
 
-temporal : False                             # temporal model (TCN available)
-num_layers: 10                               # layer for each tcn stage
-num_f_maps: 1024                             # feature output
+temporal : TCN                               # temporal model
+num_layers: 9                               # layer for each tcn stage
+num_f_maps: 512                             # feature output
 
 
 # =========================== Learning Configs ===============================
 
 epochs : 2000                                # train epochs
 transform : True                             # data aug (add noise to input feature)
-batch_size : 128                             # batch size
+batch_size : 16                              # batch size
 lr : 0.0001                                  # learning rate
           
 
 # ============================ Runtime Configs ===============================
 
 workers : 4                                  # num of workers (dataloader)
-evaluate : True                              # evaluate or not 
 start_epoch : 0                              # start epoch for training
 
 

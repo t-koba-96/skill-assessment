@@ -1,0 +1,51 @@
+## Date : 2020/8/25 
+
+
+# ============================ Path Configs ===============================
+
+data_path: "../../local/dataset/skill"       # data path (changed to my setting, default : "./data")
+ckpt_path : "./ckpt/models"                  # checkpoint path (save model weight)
+writer_path : "./ckpt/logs"                       # tensorboard path (save tensorboard)
+
+
+# ============================= Model Configs ================================
+
+num_samples : 400                            # input features to model
+attention : True                             # use attention or not
+num_filters : 3                              # filters of attention layer
+diversity_loss : True                        # use attention loss (diversity loss or not)
+disparity_loss : v1                          # use uniform(disparity loss : v1, v2 or False)
+rank_aware_loss : v1                         # use pos neg attention(rank aware loss : v1, v2 or False)
+lambda_param : 0.1                           # weight of diversity loss
+m1 : 1.0                                     # margin for ranking loss
+m2 : 0.05                                    # margin for disparity loss
+m3 : 0.15                                    # margin for rank aware loss
+
+
+# ============================= Temporal Model ================================
+
+temporal : False                             # temporal model (TCN available)
+num_layers: 9                               # layer for each tcn stage
+num_f_maps: 512                             # feature output
+
+
+# =========================== Learning Configs ===============================
+
+epochs : 2000                                # train epochs
+transform : True                             # data aug (add noise to input feature)
+batch_size : 128                             # batch size
+lr : 0.0001                                  # learning rate
+          
+
+# ============================ Runtime Configs ===============================
+
+workers : 4                                  # num of workers (dataloader)
+start_epoch : 0                              # start epoch for training
+
+
+# ============================ Monitor Configs ===============================
+
+print_freq : 5                               # train console print frequency (criteria : iter)
+eval_freq : 10                               # validation frequency (criteria : epoch)
+ckpt_freq : 5                                # save checkpoint frequency (criteria : eval_freq)
+earlystopping : 20                           # earlystopping (criteria : eval_freq)
