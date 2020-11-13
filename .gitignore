@@ -9,7 +9,8 @@ args/*
 !args/tcn.yaml
 
 # ckpt
-ckpt/* 
+ckpt/models/* 
+ckpt/logs/* 
 
 # checkpoints
 checkpoints/* 
