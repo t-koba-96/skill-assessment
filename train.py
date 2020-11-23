@@ -164,10 +164,10 @@ def main():
             end_run = early_stop.validate(prec)
             if end_run:
                 print("Valid score did not improve for {} rounds ... earlystopping\n".format(args.earlystopping))
-                writer.close()
+                Trainer.writer_close()
                 return
 
-    writer.close()
+    Trainer.writer_close()
     return
 
 

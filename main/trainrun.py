@@ -337,6 +337,12 @@ class Train_Runner():
 
 
 
+    def writer_close(self):
+
+        self.writer.close()
+
+
+
 
 # ====== Earlystopping class ======
 
