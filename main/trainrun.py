@@ -267,9 +267,10 @@ class Train_Runner():
                 output2[k] = all_output2[k].mean(dim=1)
 
             ranking_loss = 0
+            all_losses = 0
             for k in self.models["attention"].keys():
                 ranking_loss += self.criterion(output1[k], output2[k], target)
-            all_losses = ranking_loss.item()
+            all_losses += ranking_loss
             if self.args.diversity_loss:
                 div_loss_att1, div_loss_att2 = 0, 0
                 for k in self.models["attention"].keys():
@@ -415,6 +416,6 @@ def tensorboard_log_with_uniform(av_meters, mode, epoch, writer):
     writer.add_scalar(mode+'/ranking_loss_uniform', av_meters['ranking_losses_uniform'].avg, epoch)
     writer.add_scalar(mode+'/acc_uniform', av_meters['acc_uniform'].avg, epoch)
     writer.add_scalar(mode+'/rank_aware_loss', av_meters['rank_aware_losses'].avg, epoch)
-    writer.add_scalar(mode+'/phase0_loss', av_meters['phase0_loss'].avg, epoch)
-    writer.add_scalar(mode+'/phase1_loss', av_meters['phase1_loss'].avg, epoch)
+    writer.add_scalar(mode+'/phase0(ranking)_loss', av_meters['phase0_loss'].avg, epoch)
+    writer.add_scalar(mode+'/phase1(other)_loss', av_meters['phase1_loss'].avg, epoch)
     

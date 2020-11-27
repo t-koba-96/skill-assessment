@@ -79,22 +79,22 @@ if [ "$flg_s" = "TRUE" ]; then
   if [ "$flg_c" = "TRUE" ]; then
     for task in ${tasks[@]}
       do
-        python train.py ${args[0]} ${args[1]} $task --lap ${args[2]} --split $var_s --cuda $var_c
+        python train.py ${args[0]} ${args[1]} $task ${args[2]} --split $var_s --cuda $var_c
       done
   else
     for task in ${tasks[@]}
       do
-        python train.py ${args[0]} ${args[1]} $task --lap ${args[2]} --split $var_s
+        python train.py ${args[0]} ${args[1]} $task ${args[2]} --split $var_s
       done
   fi
 elif [ "$flg_c" = "TRUE" ]; then
   for task in ${tasks[@]}
     do
-      python train.py ${args[0]} ${args[1]} $task --lap ${args[2]} --cuda $var_c
+      python train.py ${args[0]} ${args[1]} $task ${args[2]} --cuda $var_c
     done
 else
   for task in ${tasks[@]}
     do
-      python train.py ${args[0]} ${args[1]} $task --lap ${args[2]}
+      python train.py ${args[0]} ${args[1]} $task ${args[2]}
     done
 fi

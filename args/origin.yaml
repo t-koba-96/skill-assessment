@@ -5,12 +5,18 @@
 
 data_path: "../../local/dataset/skill"       # data path (changed to my setting, default : "./data")
 ckpt_path : "./ckpt/models"                  # checkpoint path (save model weight)
-writer_path : "./ckpt/logs"                       # tensorboard path (save tensorboard)
+writer_path : "./ckpt/logs"                  # tensorboard path (save tensorboard)
+
+
+# ============================= Features ================================
+
+num_samples : 400                            # feature sample(length)
+input_size : 1024                            # input feature size
+output_size : 256                            # output feature size
 
 
 # ============================= Model Configs ================================
 
-num_samples : 400                            # input features to model
 attention : True                             # use attention or not
 num_filters : 3                              # filters of attention layer
 diversity_loss : True                        # use attention loss (diversity loss or not)
@@ -24,9 +30,9 @@ m3 : 0.15                                    # margin for rank aware loss
 
 # ============================= Temporal Model ================================
 
-temporal : False                             # temporal model (TCN available)
-num_layers: 9                               # layer for each tcn stage
-num_f_maps: 512                             # feature output
+temporal_model : False                       # use temporal model
+num_layers: 9                                # layer for each tcn stage
+num_f_maps: 256                              # tcn feature output
 
 
 # =========================== Learning Configs ===============================
