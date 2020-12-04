@@ -7,6 +7,7 @@ import os
 from addict import Dict
 
 from main.util import make_dirs
+from main.loss import diversity_loss, disparity_loss
 from main.dataset import SkillDataSet
 from main.model import RAAN
 from main.trainrun import Train_Runner, earlystopping
@@ -50,35 +51,40 @@ def main():
 
 
 
-    # ====== Path ======
+    # ====== Paths ======
+    # BEST dataset
     if opts.dataset == "BEST":
         train_txt = "train.txt"
         val_txt = "test.txt"
         savedir = os.path.join(opts.dataset, opts.task, opts.arg, "lap_"+opts.lap)
 
+    # Epic-skills dataset
     elif opts.dataset == "EPIC-Skills":
         train_txt = "train_split" + opts.split + ".txt"
         val_txt = "test_split" + opts.split + ".txt"
         savedir = os.path.join(opts.dataset, opts.task, opts.arg, opts.split, "lap_"+opts.lap)
 
     # paths dict
-    paths = make_dirs(args, opts, train_txt, val_txt, savedir)
+    train_list, valid_list, feature_path, writedir, ckptdir = make_dirs(args, opts, train_txt, val_txt, savedir)
+    paths = {'train_list': train_list, 'valid_list': valid_list, 
+             'feature_path': feature_path, 'writedir': writedir, 'ckptdir': ckptdir}
 
 
 
-    # ====== Model ======
-    # attention branch
+    # ====== Models ======
+    ### attention branch ###
     # → 2branch(pos and neg)
     if args.disparity_loss and args.rank_aware_loss:
         model_attention = {'pos': None, 'neg': None}
     # → 1branch
     else:
         model_attention = {'att': None}
+    # attention model
     for k in model_attention.keys():
         model_attention[k] = RAAN(args, uniform=False, tcn=args.temporal_model)
         model_attention[k] = model_attention[k].to(device)
 
-    # uniform branch
+    ### uniform branch ###
     if args.disparity_loss:
         model_uniform = RAAN(args, uniform=True, tcn=False)
         model_uniform = model_uniform.to(device)
@@ -90,7 +96,7 @@ def main():
 
 
 
-    # ====== Dataloader ======
+    # ====== Dataloaders ======
     # train_data = train_vid_list.txt 
     train_loader = torch.utils.data.DataLoader(
         SkillDataSet(paths["feature_path"], paths["train_list"], ftr_tmpl='{}_{}.npz'),
@@ -99,7 +105,7 @@ def main():
         num_workers=args.workers,
         pin_memory=True)
 
-    # validate_data = test_vid_list.txt
+    # validation_data = test_vid_list.txt
     valid_loader = torch.utils.data.DataLoader(
         SkillDataSet(paths["feature_path"], paths["valid_list"], ftr_tmpl='{}_{}.npz'),
         batch_size=args.batch_size,
@@ -107,16 +113,21 @@ def main():
         num_workers=args.workers,
         pin_memory=True)
 
-    # dataloader dict
-    dataloader = {"train" : train_loader, "valid" : valid_loader}
+    # dataloaders dict
+    dataloaders = {"train" : train_loader, "valid" : valid_loader}
 
 
 
-    # ====== Loss, Optimizer ======
-    # loss
-    criterion = torch.nn.MarginRankingLoss(margin=args.m1)
+    # ====== Losses ======
+    # lossses
+    ranking_loss = torch.nn.MarginRankingLoss(margin=args.m1)
 
-    # optimizer
+    # criterions dict
+    criterions = {"ranking" : ranking_loss, "disparity" : disparity_loss, "diversity" : diversity_loss}
+
+
+
+    # ====== Optimizers ======
     # with uniform
     if args.disparity_loss:
         attention_params = []
@@ -127,32 +138,32 @@ def main():
                     attention_params.append(param)
                 else:
                     model_params.append(param)
-        optimizer_base = torch.optim.Adam(list(model_uniform.parameters()) + model_params, args.lr)
+        optimizer_phase0 = torch.optim.Adam(list(model_uniform.parameters()) + model_params, args.lr)
         # optimizer for attention layer
-        optimizer_attention = torch.optim.Adam(attention_params, args.lr*0.1)
+        optimizer_phase1 = torch.optim.Adam(attention_params, args.lr*0.1)
     # without uniform
     else:
         model = models["attention"][list(models["attention"].keys())[0]]
-        optimizer_base = torch.optim.Adam(model.parameters(), args.lr)
-        optimizer_attention = None
+        optimizer_phase0 = torch.optim.Adam(model.parameters(), args.lr)
+        optimizer_phase1 = None
 
-    # optimizer dict
-    optimizer = {"base" : optimizer_base, "attention" : optimizer_attention}
+    # optimizers dict
+    optimizers = {"phase0" : optimizer_phase0, "phase1" : optimizer_phase1}
     
 
 
     # ====== Train ======
-    Trainer = Train_Runner(args, device, dataloader, models, criterion, optimizer, paths)
+    Trainer = Train_Runner(args, device, paths, models, dataloaders, criterions, optimizers)
 
     ###  epochs  ###
-    best_prec = Trainer.validate(0)
+    best_prec = Trainer.validate(args.start_epoch-1)
     print("\n")
     early_stop = earlystopping(args.earlystopping, best_prec)
     val_num = 0
     stop_count = 0
     phase = 0
 
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in range(args.start_epoch, args.epochs+1):
         # train
         if args.disparity_loss:
             phase = Trainer.train_with_uniform(epoch, phase=phase)
@@ -161,20 +172,20 @@ def main():
         print('\n')
 
         # valid
-        if (epoch + 1) % args.eval_freq == 0 or epoch == args.epochs - 1:
+        if epoch % args.eval_freq == 0 or epoch == args.epochs:
             # validation
             val_num += 1
-            prec = Trainer.validate(epoch+1)
+            prec = Trainer.validate(epoch)
             is_best = prec > best_prec
             best_prec = max(prec, best_prec)
 
             # save model
             # if ckpt_freq
-            if (val_num) % args.ckpt_freq == 0 or epoch == args.epochs - 1:
-                Trainer.save_checkpoint(epoch+1, prec, ckpt=True, is_best=is_best)
+            if val_num % args.ckpt_freq == 0 or epoch == args.epochs:
+                Trainer.save_checkpoint(epoch, prec, ckpt=True, is_best=is_best)
             # not ckpt_freq but has best_score
             elif is_best:
-                Trainer.save_checkpoint(epoch+1, prec, ckpt=False, is_best=True)
+                Trainer.save_checkpoint(epoch, prec, ckpt=False, is_best=True)
             
             # early stop
             end_run = early_stop.validate(prec)

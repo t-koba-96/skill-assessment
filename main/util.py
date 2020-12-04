@@ -14,14 +14,13 @@ def make_dirs(args, opts, train_txt, val_txt, savedir):
         if os.path.exists(dir):
             shutil.rmtree(dir)
         os.makedirs(dir)
-    paths = {'train_list': train_list, 'valid_list': valid_list, 'feature_path': feature_path, 'writedir': writedir, 'ckptdir': ckptdir}
-    return paths
+    return train_list, valid_list, feature_path, writedir, ckptdir
 
 
-def accuracy(output1, output2):
+def accuracy(score_pos, score_neg):
     """Computes the % of correctly ordered pairs"""
-    pred1 = output1
-    pred2 = output2
+    pred1 = score_pos
+    pred2 = score_neg
     correct = torch.gt(pred1, pred2)
     return float(correct.sum())/correct.size(0), int(correct.sum())
 

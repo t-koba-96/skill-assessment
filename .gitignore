@@ -25,7 +25,8 @@ runs/*
 
 # jupyter notebooks
 *.ipynb
-!test.ipynb
+!eval.ipynb
+!ex.ipynb
 
 # gitkeep
 !.gitkeep

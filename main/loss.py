@@ -8,7 +8,7 @@ def diversity_loss(attention, args, device):
     return torch.norm(res, p=2, dim=1).sum() / attention.size(0)
 
 
-def multi_rank_loss(input_a_1, input_a_2, input_b_1, input_b_2, target, margin, device, version):
+def disparity_loss(input_a_1, input_a_2, input_b_1, input_b_2, target, margin, device, version):
     if version == "v1":
         inter1, _ = torch.min((input_a_1 - input_a_2), dim=1)
     elif version == "v2":

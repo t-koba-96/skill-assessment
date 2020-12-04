@@ -4,7 +4,6 @@ import torch
 import glob
 from torch.utils.tensorboard import SummaryWriter
 
-from main.loss import diversity_loss, multi_rank_loss
 from main.util import AverageMeter, data_augmentation, accuracy, sec2str
 
 
@@ -12,14 +11,15 @@ from main.util import AverageMeter, data_augmentation, accuracy, sec2str
 
 class Train_Runner():
 
-    def __init__(self, args, device, dataloader, models, criterion, optimizer, paths):
+    def __init__(self, args, device, paths, models, dataloaders, criterions, optimizers):
 
         self.args = args
         self.device = device
-        self.dataloader = dataloader
+        self.dataloaders = dataloaders
         self.models = models
-        self.criterion = criterion
-        self.optimizer = optimizer
+        self.att_branches = self.models["attention"].keys()
+        self.criterions = criterions
+        self.optimizers = optimizers
         self.ckptdir = paths["ckptdir"]
         self.writer = SummaryWriter(paths["writedir"])
 
@@ -29,291 +29,275 @@ class Train_Runner():
 
     def train_without_uniform(self, epoch):
 
+        # start epoch
         begin = time.time()
-        print('Training : Epoch[{}/{}]'.format(epoch+1, self.args.epochs))
+        print('Training : Epoch[{}/{}]'.format(epoch, self.args.epochs))
+        # meters
+        Meters = UpdateMeters(self.args)
 
-        av_meters = {'batch_time': AverageMeter(), 'losses': AverageMeter(),
-                    'phase0_loss': AverageMeter(), 'phase1_loss': AverageMeter(),
-                    'ranking_losses': AverageMeter(), 'diversity_losses': AverageMeter(), 
-                    'correct': AverageMeter(), 'acc': AverageMeter()}
-        
-        model = self.models["attention"][list(self.models["attention"].keys())[0]]
+        # model train mode
+        model = self.models["attention"][list(self.att_branches)[0]]
         model.train()
-        
-        self.optimizer["base"].zero_grad()
+        self.optimizers["phase0"].zero_grad()
 
-        ## iter ## 
-        for i, (input1, input2, vid_list) in enumerate(self.dataloader["train"]):
-            input1_gpu = input1.to(self.device)
-            input2_gpu = input2.to(self.device)
-            ## add small amount of gaussian noise
+        # ====== iter ======  
+        for i, (vid_pos, vid_neg, vid_list) in enumerate(self.dataloaders["train"]):
+            batch_size = vid_pos.size(0)
+            vid_pos_gpu = vid_pos.to(self.device)
+            vid_neg_gpu = vid_neg.to(self.device)
+            # add gaussian noise
             if self.args.transform:
-                input1_gpu, input2_gpu = data_augmentation(input1_gpu, input2_gpu, self.device)
+                vid_pos_gpu, vid_neg_gpu = data_augmentation(vid_pos_gpu, vid_neg_gpu, self.device)
                 
-            labels = torch.ones(input1.size(0))
-            target = labels.to(self.device)
+            # make target label
+            target = torch.ones(batch_size)
+            target = target.to(self.device)
 
-            output1, att1 = model(input1_gpu)
-            output2, att2 = model(input2_gpu)
+            # calc score, attention
+            score_pos, att_pos = model(vid_pos_gpu)
+            score_neg, att_neg = model(vid_neg_gpu)
+
             # mean all filter
-            output1 = output1.mean(dim=1)
-            output2 = output2.mean(dim=1)
+            score_pos = score_pos.mean(dim=1)
+            score_neg = score_neg.mean(dim=1)
 
-            
+            # measure accuracy
+            prec, correct_num = accuracy(score_pos.data, score_neg.data)
+
+            # loss update  
             ranking_loss = 0
+            diversity_loss = 0
             all_losses = 0
-            # ranking_loss : margin - output1 + output2
-            ranking_loss += self.criterion(output1, output2, target)
+            # ranking_loss : margin - score_pos + score_neg
+            ranking_loss += self.criterions["ranking"](score_pos, score_neg, target)
             all_losses += ranking_loss
             if self.args.diversity_loss:
-                div_loss_att1 = diversity_loss(att1, self.args, self.device)
-                div_loss_att2 = diversity_loss(att2, self.args, self.device)
-                all_losses += self.args.lambda_param*(div_loss_att1 + div_loss_att2)
+                div_loss_att_pos = self.criterions["diversity"](att_pos, self.args, self.device)
+                div_loss_att_neg = self.criterions["diversity"](att_neg, self.args, self.device)
+                diversity_loss += self.args.lambda_param * (div_loss_att_pos + div_loss_att_neg)
+                all_losses += diversity_loss
                 
-            # measure accuracy and backprop
-            prec, cor = accuracy(output1.data, output2.data)
-
+            # backprop
             all_losses.backward()
+            self.optimizers["phase0"].step()
+            self.optimizers["phase0"].zero_grad()
 
-            self.optimizer["base"].step()
-            self.optimizer["base"].zero_grad()
-
-            # record losses
-            av_meters['ranking_losses'].update(ranking_loss.item(), input1.size(0))
-            if self.args.diversity_loss:
-                av_meters['diversity_losses'].update(self.args.lambda_param*(div_loss_att1.item()+div_loss_att2.item()),
-                                                    input1.size(0))
-            av_meters['phase0_loss'].update(all_losses.data.item(), input1.size(0))
-            av_meters['losses'].update(all_losses.data.item(), input1.size(0))
-            av_meters['acc'].update(prec, input1.size(0))
-            av_meters['correct'].update(cor)
+            # update records
+            records = {"ranking" : ranking_loss, "diversity" : diversity_loss, "total" : all_losses,
+                       "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
+            Meters.update_without_uniform(records, batch_size)
 
             # measure elapsed time
-            av_meters['batch_time'].update(time.time() - begin)
             begin = time.time()
             total_time = time.time() - self.args.start_time
 
+            # iter log
             if i % (self.args.print_freq) == 0:
-                console_log_train_batch(av_meters, epoch+1, self.args.epochs, i+1, 
-                                        len(self.dataloader["train"]), total_time, input1.size(0))
+                console_log_train_batch(Meters.meters, epoch, self.args.epochs, i+1, 
+                                        len(self.dataloaders["train"]), total_time, batch_size)
 
-        console_log_train(av_meters, epoch+1, self.args.epochs, total_time)
-        tensorboard_log(av_meters, 'train', epoch+1, self.writer) 
+        # epoch log
+        console_log_train(Meters.meters, epoch, self.args.epochs, total_time)
+        tensorboard_log(Meters.meters, 'train', epoch, self.writer) 
 
 
 
     def train_with_uniform(self, epoch, phase=0):
 
+        # start epoch
         begin = time.time()
-        print('Training : Epoch[{}/{}]'.format(epoch+1, self.args.epochs))
-
-        av_meters = {'batch_time': AverageMeter(), 'losses': AverageMeter(),
-                    'phase0_loss': AverageMeter(), 'phase1_loss': AverageMeter(),
-                    'ranking_losses': AverageMeter(), 'ranking_losses_uniform': AverageMeter(),
-                    'diversity_losses': AverageMeter(), 'disparity_losses': AverageMeter(),
-                    'rank_aware_losses': AverageMeter(), 'correct': AverageMeter(), 
-                    'acc': AverageMeter(), 'acc_uniform': AverageMeter()}
+        print('Training : Epoch[{}/{}]'.format(epoch, self.args.epochs))
+        # meters
+        Meters = UpdateMeters(self.args)
         
-        for k in self.models["attention"].keys():
+        # model train mode
+        for k in self.att_branches:
             self.models["attention"][k].train()
         self.models["uniform"].train()
-        
-        self.optimizer["base"].zero_grad()
-        self.optimizer["attention"].zero_grad()
+        self.optimizers["phase0"].zero_grad()
+        self.optimizers["phase1"].zero_grad()
 
-        ## iter ## 
-        for i, (input1, input2, vid_list) in enumerate(self.dataloader["train"]):
-            input1_gpu = input1.to(self.device)
-            input2_gpu = input2.to(self.device)
+        # ====== iter ====== 
+        for i, (vid_pos, vid_neg, vid_list) in enumerate(self.dataloaders["train"]):
+            batch_size = vid_pos.size(0)
+            vid_pos_gpu = vid_pos.to(self.device)
+            vid_neg_gpu = vid_neg.to(self.device)
             ## add small amount of gaussian noise
             if self.args.transform:
-                input1_gpu, input2_gpu = data_augmentation(input1_gpu, input2_gpu, self.device)
+                vid_pos_gpu, vid_neg_gpu = data_augmentation(vid_pos_gpu, vid_neg_gpu, self.device)
                 
-            labels = torch.ones(input1.size(0))
-            target = labels.to(self.device)
+            # make target label
+            target = torch.ones(batch_size)
+            target = target.to(self.device)
 
-            all_output1, all_output2, output1, output2, att1, att2 = {}, {}, {}, {}, {}, {}
-            # attention model
-            for k in self.models["attention"].keys():
-                # batch * filter 
-                all_output1[k], att1[k] = self.models["attention"][k](input1_gpu)
-                all_output2[k], att2[k] = self.models["attention"][k](input2_gpu)
+            # calc score, attention
+            all_score_pos, all_score_neg, score_pos, score_neg, att_pos, att_neg = {}, {}, {}, {}, {}, {}
+            final_score_pos = torch.zeros(batch_size).to(self.device)
+            final_score_neg = torch.zeros(batch_size).to(self.device)
+            ### attention model ###
+            for k in self.att_branches:
+                all_score_pos[k], att_pos[k] = self.models["attention"][k](vid_pos_gpu)
+                all_score_neg[k], att_neg[k] = self.models["attention"][k](vid_neg_gpu)
                 # mean all filter
-                output1[k] = all_output1[k].mean(dim=1)
-                output2[k] = all_output2[k].mean(dim=1)
-            # uniform model
-            output1_uniform, _ = self.models["uniform"](input1_gpu)
-            output2_uniform, _ = self.models["uniform"](input2_gpu)
-            output1_uniform = output1_uniform.mean(dim=1)
-            output2_uniform = output2_uniform.mean(dim=1)
+                score_pos[k] = all_score_pos[k].mean(dim=1)
+                score_neg[k] = all_score_neg[k].mean(dim=1)
+                final_score_pos += score_pos[k].data
+                final_score_neg += score_neg[k].data
+            ### uniform model ###
+            uniformscore_pos, _ = self.models["uniform"](vid_pos_gpu)
+            uniformscore_neg, _ = self.models["uniform"](vid_neg_gpu)
+            # mean all filter
+            uniformscore_pos = uniformscore_pos.mean(dim=1)
+            uniformscore_neg = uniformscore_neg.mean(dim=1)
 
+            # measure accuracy
+            prec, correct_num = accuracy(final_score_pos, final_score_neg)
+            prec_uniform, correct_num_uniform = accuracy(uniformscore_pos.data, uniformscore_neg.data)
+
+            # loss calc
             ranking_loss = 0
             ranking_loss_uniform = 0
+            diversity_loss = 0
             disparity_loss = 0
             rank_aware_loss = 0
-            for k in self.models["attention"].keys():
-                ranking_loss += self.criterion(output1[k], output2[k], target)
-                disparity_loss += multi_rank_loss(all_output1[k], all_output2[k], output1_uniform,
-                                                    output2_uniform, target, self.args.m2, self.device, self.args.disparity_loss)
-            ranking_loss_uniform += self.criterion(output1_uniform, output2_uniform, target)
+            # ranking_loss , disparity_loss
+            for k in self.att_branches:
+                ranking_loss += self.criterions["ranking"](score_pos[k], score_neg[k], target)
+                disparity_loss += self.criterions["disparity"](all_score_pos[k], all_score_neg[k], uniformscore_pos,
+                                                    uniformscore_neg, target, self.args.m2, self.device, self.args.disparity_loss)
+            ranking_loss_uniform += self.criterions["ranking"](uniformscore_pos, uniformscore_neg, target)
+            # rank_aware_loss
             if self.args.rank_aware_loss:
-                rank_aware_loss += multi_rank_loss(all_output1['pos'], all_output2['neg'], output1_uniform,
-                                                    output2_uniform, target, self.args.m3, self.device, self.args.rank_aware_loss)
-
+                rank_aware_loss += self.criterions["disparity"](all_score_pos['pos'], all_score_neg['neg'], uniformscore_pos,
+                                                    uniformscore_neg, target, self.args.m3, self.device, self.args.rank_aware_loss)
+            # diversity_loss
             if self.args.diversity_loss:
-                div_loss_att1, div_loss_att2 = 0, 0
-                for k in self.models["attention"].keys():
-                    div_loss_att1 += diversity_loss(att1[k], self.args, self.device)
-                    div_loss_att2 += diversity_loss(att2[k], self.args, self.device)
+                div_loss_att_pos, div_loss_att_neg = 0, 0
+                for k in self.att_branches:
+                    div_loss_att_pos += self.criterions["diversity"](att_pos[k], self.args, self.device)
+                    div_loss_att_neg += self.criterions["diversity"](att_neg[k], self.args, self.device)
+                    diversity_loss += self.args.lambda_param * (div_loss_att_pos + div_loss_att_neg)
 
+            # loss update
             all_losses = 0
             # ranking loss
             if phase == 0:
                 all_losses += ranking_loss
                 all_losses += ranking_loss_uniform
-                av_meters['phase0_loss'].update(all_losses.item(), input1.size(0))
-                av_meters['phase1_loss'].reset_val()
             # other 3 losses
             else:
                 all_losses += disparity_loss
                 if self.args.rank_aware_loss:
                     all_losses += rank_aware_loss
                 if self.args.diversity_loss:
-                    all_losses += self.args.lambda_param*(div_loss_att1 + div_loss_att2)
-                av_meters['phase1_loss'].update(all_losses.item(), input1.size(0))
-                av_meters['phase0_loss'].reset_val()
+                    all_losses += diversity_loss
 
-
-            # final output (e.g. pos + neg)
-            output1_all = torch.zeros(output1[list(self.models["attention"].keys())[0]].data.shape)
-            output1_all = output1_all.to(self.device)
-            output2_all = torch.zeros(output2[list(self.models["attention"].keys())[0]].data.shape)
-            output2_all = output2_all.to(self.device)
-            for k in self.models["attention"].keys():
-                output1_all += output1[k].data
-                output2_all += output2[k].data
-
-            # measure accuracy and backprop
-            prec, cor = accuracy(output1_all, output2_all)
-            prec_uniform, cor_uniform = accuracy(output1_uniform.data, output2_uniform.data)
-
+            # backprop
             all_losses.backward()
-            
-            # train optimizer alternately
             if phase == 0:
-                self.optimizer["base"].step()
-                self.optimizer["base"].zero_grad()
+                self.optimizers["phase0"].step()
+                self.optimizers["phase0"].zero_grad()
                 phase = 1
             else:
-                self.optimizer["attention"].step()
-                self.optimizer["attention"].zero_grad()
+                self.optimizers["phase1"].step()
+                self.optimizers["phase1"].zero_grad()
                 phase = 0
     
-            # record losses
-            av_meters['ranking_losses'].update(ranking_loss.item(), input1.size(0)*len(self.models["attention"].keys()))
-            av_meters['ranking_losses_uniform'].update(ranking_loss_uniform.item(), input1.size(0))
-            av_meters['disparity_losses'].update(disparity_loss.item(), input1.size(0)*len(self.models["attention"].keys()))
-            if self.args.diversity_loss:
-                av_meters['diversity_losses'].update(self.args.lambda_param*(div_loss_att1.item()+div_loss_att2.item()),
-                                                    input1.size(0)*len(self.models["attention"].keys()))
-            if self.args.rank_aware_loss:
-                av_meters['rank_aware_losses'].update(rank_aware_loss.item(), input1.size(0))
-            av_meters['losses'].update(all_losses.data.item(), input1.size(0))
-            av_meters['acc'].update(prec, input1.size(0))
-            av_meters['correct'].update(cor)
-            av_meters['acc_uniform'].update(prec_uniform, input1.size(0))
+            # update records
+            records = {"ranking" : ranking_loss, "ranking_uniform" : ranking_loss_uniform, 
+                       "disparity" : disparity_loss, "rank_aware" : rank_aware_loss , "diversity" : diversity_loss, 
+                       "total" : all_losses, "acc" : prec, "acc_uniform" : prec_uniform,
+                       "correct" : correct_num, "batch_time" : time.time() - begin }
+            Meters.update_with_uniform(records, batch_size, len(self.att_branches), phase = phase)
 
             # measure elapsed time
-            av_meters['batch_time'].update(time.time() - begin)
             begin = time.time()
             total_time = time.time() - self.args.start_time
 
+            # iter log
             if i % (self.args.print_freq) == 0:
-                console_log_train_batch(av_meters, epoch+1, self.args.epochs, i+1, 
-                                        len(self.dataloader["train"]), total_time, input1.size(0))
+                console_log_train_batch(Meters.meters, epoch, self.args.epochs, i+1, 
+                                        len(self.dataloaders["train"]), total_time, batch_size)
 
-        console_log_train(av_meters, epoch+1, self.args.epochs, total_time)
-        tensorboard_log_with_uniform(av_meters, 'train', epoch+1, self.writer)
+        # epoch log
+        console_log_train(Meters.meters, epoch, self.args.epochs, total_time)
+        tensorboard_log_with_uniform(Meters.meters, 'train', epoch, self.writer)
         return phase
 
 
 
     def validate(self, epoch):
 
+        # start epoch
         begin = time.time()
         print('Testing : Epoch[{}/{}]'.format(epoch, self.args.epochs))
+        # meters
+        Meters = UpdateMeters(self.args)
 
-        av_meters = {'batch_time': AverageMeter(), 'losses': AverageMeter(),
-                    'ranking_losses': AverageMeter(), 'diversity_losses': AverageMeter(),
-                    'correct': AverageMeter(), 'acc': AverageMeter()}
-
-        # switch to evaluate mode
-        for k in self.models["attention"].keys():
+        # model evaluate mode
+        for k in self.att_branches:
             self.models["attention"][k].eval()
 
+        # ====== iter ====== 
+        for i, (vid_pos, vid_neg, vid_list) in enumerate(self.dataloaders["valid"]):
+            batch_size = vid_pos.size(0)
+            vid_pos_gpu = vid_pos.to(self.device)
+            vid_neg_gpu = vid_neg.to(self.device)
 
-        for i, (input1, input2, vid_list) in enumerate(self.dataloader["valid"]):
-            input1_gpu = input1.to(self.device)
-            input2_gpu = input2.to(self.device)
+            # make target label
+            target = torch.ones(batch_size)
+            target = target.to(self.device)
 
-            labels = torch.ones(input1.size(0))
-            target = labels.to(self.device)
-
-            all_output1, all_output2, output1, output2, att1, att2 = {}, {}, {}, {}, {}, {}
-            for k in self.models["attention"].keys():
-                all_output1[k], att1[k] = self.models["attention"][k](input1_gpu)
-                all_output2[k], att2[k] = self.models["attention"][k](input2_gpu)
-                output1[k] = all_output1[k].mean(dim=1)
-                output2[k] = all_output2[k].mean(dim=1)
-
-            ranking_loss = 0
-            all_losses = 0
-            for k in self.models["attention"].keys():
-                ranking_loss += self.criterion(output1[k], output2[k], target)
-            all_losses += ranking_loss
-            if self.args.diversity_loss:
-                div_loss_att1, div_loss_att2 = 0, 0
-                for k in self.models["attention"].keys():
-                    div_loss_att1 += diversity_loss(att1[k], self.args, self.device)
-                    div_loss_att2 += diversity_loss(att2[k], self.args, self.device)
-                all_losses += self.args.lambda_param*(div_loss_att1 + div_loss_att2)
-            
-            # final output
-            output1_all = torch.zeros(output1[list(self.models["attention"].keys())[0]].data.shape)
-            output1_all = output1_all.to(self.device)
-            output2_all = torch.zeros(output2[list(self.models["attention"].keys())[0]].data.shape)
-            output2_all = output2_all.to(self.device)
-            for k in self.models["attention"].keys():
-                output1_all += output1[k].data
-                output2_all += output2[k].data
+            # calc score, attention
+            all_score_pos, all_score_neg, score_pos, score_neg, att_pos, att_neg = {}, {}, {}, {}, {}, {}
+            final_score_pos = torch.zeros(batch_size).to(self.device)
+            final_score_neg = torch.zeros(batch_size).to(self.device)
+            for k in self.att_branches:
+                all_score_pos[k], att_pos[k] = self.models["attention"][k](vid_pos_gpu)
+                all_score_neg[k], att_neg[k] = self.models["attention"][k](vid_neg_gpu)
+                score_pos[k] = all_score_pos[k].mean(dim=1)
+                score_neg[k] = all_score_neg[k].mean(dim=1)
+                final_score_pos += score_pos[k].data
+                final_score_neg += score_neg[k].data
 
             # measure accuracy 
-            prec, cor = accuracy(output1_all, output2_all)
+            prec, correct_num = accuracy(final_score_pos, final_score_neg)
 
-            # record losses
-            av_meters['ranking_losses'].update(ranking_loss.item(), input1.size(0)*len(self.models["attention"].keys()))
+            # loss calc
+            ranking_loss = 0
+            diversity_loss = 0
+            all_losses = 0
+            for k in self.att_branches:
+                ranking_loss += self.criterions["ranking"](score_pos[k], score_neg[k], target)
+            all_losses += ranking_loss
             if self.args.diversity_loss:
-                av_meters['diversity_losses'].update(self.args.lambda_param*(div_loss_att1.item()+div_loss_att2.item()),
-                                                    input1.size(0)*len(self.models["attention"].keys()))
-            av_meters['losses'].update(all_losses.data.item(), input1.size(0))
-            av_meters['acc'].update(prec, input1.size(0))
-            av_meters['correct'].update(cor)
+                div_loss_att_pos, div_loss_att_neg = 0, 0
+                for k in self.att_branches:
+                    div_loss_att_pos += self.criterions["diversity"](att_pos[k], self.args, self.device)
+                    div_loss_att_neg += self.criterions["diversity"](att_neg[k], self.args, self.device)
+                diversity_loss += self.args.lambda_param*(div_loss_att_pos + div_loss_att_neg)
+                all_losses += diversity_loss
+            
+            # update records
+            records = {"ranking" : ranking_loss, "diversity" : diversity_loss, "total" : all_losses,
+                       "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
+            Meters.update_validate(records, batch_size, len(self.att_branches))
 
             # measure elapsed time
-            av_meters['batch_time'].update(time.time() - begin)
             begin = time.time()
 
-        console_log_test(av_meters)
-        tensorboard_log(av_meters, 'val', epoch, self.writer)
+        # log
+        console_log_test(Meters.meters)
+        tensorboard_log(Meters.meters, 'val', epoch, self.writer)
         
-        return av_meters['acc'].avg
+        return Meters.meters['acc'].avg
 
 
 
     def make_ckpt(self, epoch, prec):
 
         checkpoint_dict = {'epoch': epoch, 'prec_score': prec}
-        for k in self.models["attention"].keys():
+        for k in self.att_branches:
             checkpoint_dict['state_dict_' + k] = self.models["attention"][k].state_dict()
         if self.args.disparity_loss:
             checkpoint_dict['state_dict_uniform'] = self.models["uniform"].state_dict()
@@ -366,56 +350,108 @@ class earlystopping():
        return False
 
 
+# ====== Update meters ======
+
+class UpdateMeters():
+    def __init__(self, args):
+        self.meters = {'batch_time': AverageMeter(), 'losses': AverageMeter(),
+                       'phase0_loss': AverageMeter(), 'phase1_loss': AverageMeter(),
+                       'ranking_losses': AverageMeter(), 'ranking_losses_uniform': AverageMeter(),
+                       'diversity_losses': AverageMeter(), 'disparity_losses': AverageMeter(),
+                       'rank_aware_losses': AverageMeter(), 'correct': AverageMeter(), 
+                       'acc': AverageMeter(), 'acc_uniform': AverageMeter()}
+        self.args = args
+    
+    def update_without_uniform(self, records, batch_size):
+        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size)
+        if self.args.diversity_loss:
+            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size)
+        self.meters['losses'].update(records["total"].data.item(), batch_size)
+        self.meters['acc'].update(records["acc"], batch_size)
+        self.meters['correct'].update(records["correct"])
+        self.meters['batch_time'].update(records["batch_time"])
+
+    def update_with_uniform(self, records, batch_size, len_att, phase = 0):
+        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size * len_att)
+        self.meters['ranking_losses_uniform'].update(records["ranking_uniform"].item(), batch_size)
+        self.meters['disparity_losses'].update(records["disparity"].item(), batch_size*len_att)
+        if self.args.diversity_loss:
+            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size * len_att)
+        if self.args.rank_aware_loss:
+            self.meters['rank_aware_losses'].update(records["rank_aware"].item(), batch_size)
+        if phase == 0:
+            self.meters['phase1_loss'].update(records["total"].data.item(), batch_size)
+            self.meters['phase0_loss'].reset_val()
+        elif phase == 1:
+            self.meters['phase0_loss'].update(records["total"].data.item(), batch_size)
+            self.meters['phase1_loss'].reset_val()
+        self.meters['losses'].update(records["total"].data.item(), batch_size)
+        self.meters['acc'].update(records["acc"], batch_size)
+        self.meters['acc_uniform'].update(records["acc_uniform"], batch_size)
+        self.meters['correct'].update(records["correct"])
+        self.meters['batch_time'].update(records["batch_time"])
+
+    def update_validate(self, records, batch_size, len_att):
+        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size * len_att)
+        if self.args.diversity_loss:
+            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size * len_att)
+        self.meters['losses'].update(records["total"].data.item(), batch_size)
+        self.meters['acc'].update(records["acc"], batch_size)
+        self.meters['correct'].update(records["correct"])
+        self.meters['batch_time'].update(records["batch_time"])
+
+
 # ====== Console log ======
 
-def console_log_train_batch(av_meters, epoch, total_epoch, iter, 
-                            loader_len, total_time, total):
+def console_log_train_batch(meters, epoch, total_epoch, iter, loader_len, total_time, total):
     print(('Epoch:[{0}/{1}]Iter:[{2}/{3}]\t'
            'Time:{batch_time.val:.2f}s({4})\t\t'
+           'Loss:{loss.val:.5f}\t'
            'Loss(Rank):{phase0_loss.val:.5f}\t'
            'Loss(Others):{phase1_loss.val:.5f}\t'
            'Accuracy:{acc.val:.3f}({correct.val}/{5})'.format(
                epoch, total_epoch, iter, loader_len, 
                sec2str(total_time), total, 
-               batch_time=av_meters['batch_time'], loss=av_meters['losses'], 
-               phase0_loss=av_meters['phase0_loss'], phase1_loss=av_meters['phase1_loss'],
-               correct=av_meters['correct'], acc=av_meters['acc'])))
+               batch_time=meters['batch_time'], loss=meters['losses'], 
+               phase0_loss=meters['phase0_loss'], phase1_loss=meters['phase1_loss'],
+               correct=meters['correct'], acc=meters['acc'])))
 
-def console_log_train(av_meters, epoch, total_epoch, total_time):
+def console_log_train(meters, epoch, total_epoch, total_time):
     print(('[Epoch:({0}/{1}]) Results]\t'
            'Time:{batch_time.sum:.2f}s({2})\t\t'
+           'Loss:{loss.avg:.5f}\t'
            'Loss(Rank):{phase0_loss.avg:.5f}\t'
            'Loss(Others):{phase1_loss.avg:.5f}\t'
            'Accuracy:{acc.avg:.3f}({correct.sum}/{acc.count})'.format(
                epoch, total_epoch, sec2str(total_time), 
-               batch_time=av_meters['batch_time'], loss=av_meters['losses'], 
-               phase0_loss=av_meters['phase0_loss'], phase1_loss=av_meters['phase1_loss'],
-               correct=av_meters['correct'], acc=av_meters['acc'])))
+               batch_time=meters['batch_time'], loss=meters['losses'], 
+               phase0_loss=meters['phase0_loss'], phase1_loss=meters['phase1_loss'],
+               correct=meters['correct'], acc=meters['acc'])))
 
-def console_log_test(av_meters):
+def console_log_test(meters):
     print(('[Testing Results]\t'
            'Time:{batch_time.sum:.3f}s\t'
            'Loss(Rank):{r_loss.avg:.5f}\t'
            'Loss(Rank+Div):{loss.avg:.5f}\t'
            'Accuracy:{acc.avg:.3f}({correct.sum}/{acc.count})'.format(
-               batch_time=av_meters['batch_time'], r_loss=av_meters['ranking_losses'],
-               loss=av_meters['losses'],correct=av_meters['correct'], acc=av_meters['acc'])))
+               batch_time=meters['batch_time'], r_loss=meters['ranking_losses'],
+               loss=meters['losses'],correct=meters['correct'], acc=meters['acc'])))
 
 
 # ====== Tensorboard log ======
 
-def tensorboard_log(av_meters, mode, epoch, writer):
-    writer.add_scalar(mode+'/total_loss', av_meters['losses'].avg, epoch)
-    writer.add_scalar(mode+'/ranking_loss', av_meters['ranking_losses'].avg, epoch)
-    writer.add_scalar(mode+'/diversity_loss', av_meters['diversity_losses'].avg, epoch)
-    writer.add_scalar(mode+'/acc', av_meters['acc'].avg, epoch)
+def tensorboard_log(meters, mode, epoch, writer):
+    writer.add_scalar(mode+'_loss/total_loss', meters['losses'].avg, epoch)
+    writer.add_scalar(mode+'_loss/ranking_loss', meters['ranking_losses'].avg, epoch)
+    writer.add_scalar(mode+'_loss/diversity_loss', meters['diversity_losses'].avg, epoch)
+    writer.add_scalar(mode+'_score/acc', meters['acc'].avg, epoch)
 
-def tensorboard_log_with_uniform(av_meters, mode, epoch, writer):
-    tensorboard_log(av_meters, mode, epoch, writer)
-    writer.add_scalar(mode+'/disparity_loss', av_meters['disparity_losses'].avg, epoch)
-    writer.add_scalar(mode+'/ranking_loss_uniform', av_meters['ranking_losses_uniform'].avg, epoch)
-    writer.add_scalar(mode+'/acc_uniform', av_meters['acc_uniform'].avg, epoch)
-    writer.add_scalar(mode+'/rank_aware_loss', av_meters['rank_aware_losses'].avg, epoch)
-    writer.add_scalar(mode+'/phase0(ranking)_loss', av_meters['phase0_loss'].avg, epoch)
-    writer.add_scalar(mode+'/phase1(other)_loss', av_meters['phase1_loss'].avg, epoch)
+def tensorboard_log_with_uniform(meters, mode, epoch, writer):
+    tensorboard_log(meters, mode, epoch, writer)
+    writer.add_scalar(mode+'_loss/disparity_loss', meters['disparity_losses'].avg, epoch)
+    writer.add_scalar(mode+'_loss/ranking_loss_uniform', meters['ranking_losses_uniform'].avg, epoch)
+    writer.add_scalar(mode+'_score/acc_uniform', meters['acc_uniform'].avg, epoch)
+    writer.add_scalar(mode+'_loss/rank_aware_loss', meters['rank_aware_losses'].avg, epoch)
+    writer.add_scalar(mode+'_loss/phase0(ranking)_loss', meters['phase0_loss'].avg, epoch)
+    writer.add_scalar(mode+'_loss/phase1(other)_loss', meters['phase1_loss'].avg, epoch)
     

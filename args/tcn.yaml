@@ -46,7 +46,7 @@ lr : 0.0001                                  # learning rate
 # ============================ Runtime Configs ===============================
 
 workers : 4                                  # num of workers (dataloader)
-start_epoch : 0                              # start epoch for training
+start_epoch : 1                              # start epoch for training
 
 
 # ============================ Monitor Configs ===============================

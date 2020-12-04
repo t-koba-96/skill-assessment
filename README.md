@@ -42,10 +42,10 @@ bash download/download_features.sh
 
 ### Args
 
-- Args for training are writen in yaml file. Default args are in [template.yaml](./args/template.yaml).  
+- Args for training are writen in yaml file. Default args are in [origin.yaml](./args/origin.yaml).  
 - Make a new yaml file in the args directory to train on your on settings.  
 - [arg_file] for training will be the name before .yaml.   
-(For example, [arg_file] for template.yaml will be template)
+(For example, [arg_file] for origin.yaml will be origin)
 
 
 ### Train each task
@@ -53,40 +53,44 @@ bash download/download_features.sh
 For training each task independently use [train.py](train.py) as:
 
 ```
-python train.py [arg_file] [dataset] [task] [--lap [lap_count]] [--split [split for EPIC-Skills]] [--cuda [gpu_num]]  
+python train.py [arg_file] [dataset] [task] [lap_count] [--split [split for EPIC-Skills]] [--cuda [gpu_num]]  
 ```  
 
 ### Train all task
 
-For training all tasks together use [train_all.sh](train_all.sh) as:
+For training all tasks together use [run.sh](run.sh) as:
 
 ```
-bash train_all.sh [arg_file] [dataset] [lap_count] [--split(-s) [split for EPIC-Skills]] [--cuda(-c) [gpu_num]]
+bash run.sh [arg_file] [dataset] [lap_count] [--split(-s) [split for EPIC-Skills]] [--cuda(-c) [gpu_num]]
 ```
 
-Use Help option (--help) for more info.
+Use Help option (--help) for more info.  
+
+### Ablation Study  
+
+To do . [ablationrun.sh](ablationrun.sh)
 
 
 ### Checkpoints
 
 - Model weights  
-  - For default, trained model weights are saved to [checkpoints](./checkpoints)
-  - Change the save directory if you want by changing the ckpt_path in [arg_file](./args/template.yaml)
+  - For default, trained model weights are saved to [./ckpt/models](./ckpt/models)
+  - Change the save directory if you want by changing the ckpt_path in [arg_file](./args/origin.yaml)
   - The best score is saved as (best_score_ ... .ckpt).
 
 - Tensorboard logs
-  - For default, tensorboard logs are saved to [runs](./runs)
-  - Change the log directory if you want by changing the writer_path in [arg_file](./args/template.yaml)
+  - For default, tensorboard logs are saved to [./ckpt/logs](./ckpt/logs)
+  - Change the log directory if you want by changing the writer_path in [arg_file](./args/origin.yaml)
 
   (Private note : when starting tensorboard log on lab server)
   ```
-  tensorboard --logdir runs --port 8888 --bind_all
+  tensorboard --logdir ckpt/logs --port 8888 --bind_all
   ```
 
 
 ## Evaluate  
 
-.To do  
+To do .
 
 
 ## References  
