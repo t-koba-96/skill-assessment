@@ -98,7 +98,7 @@ class Train_Runner():
 
         # epoch log
         console_log_train(Meters.meters, epoch, self.args.epochs, total_time)
-        tensorboard_log(Meters.meters, 'train', epoch, self.writer) 
+        tensorboard_log_train(Meters.meters, 'train', epoch, self.writer) 
 
 
 
@@ -221,7 +221,7 @@ class Train_Runner():
 
         # epoch log
         console_log_train(Meters.meters, epoch, self.args.epochs, total_time)
-        tensorboard_log_with_uniform(Meters.meters, 'train', epoch, self.writer)
+        tensorboard_log_train(Meters.meters, 'train', epoch, self.writer)
         return phase
 
 
@@ -288,7 +288,7 @@ class Train_Runner():
 
         # log
         console_log_test(Meters.meters)
-        tensorboard_log(Meters.meters, 'val', epoch, self.writer)
+        tensorboard_log_test(Meters.meters, 'val', epoch, self.writer)
         
         return Meters.meters['acc'].avg
 
@@ -440,14 +440,14 @@ def console_log_test(meters):
 
 # ====== Tensorboard log ======
 
-def tensorboard_log(meters, mode, epoch, writer):
+def tensorboard_log_test(meters, mode, epoch, writer):
     writer.add_scalar(mode+'_loss/total_loss', meters['losses'].avg, epoch)
     writer.add_scalar(mode+'_loss/ranking_loss', meters['ranking_losses'].avg, epoch)
     writer.add_scalar(mode+'_loss/diversity_loss', meters['diversity_losses'].avg, epoch)
     writer.add_scalar(mode+'_score/acc', meters['acc'].avg, epoch)
 
-def tensorboard_log_with_uniform(meters, mode, epoch, writer):
-    tensorboard_log(meters, mode, epoch, writer)
+def tensorboard_log_train(meters, mode, epoch, writer):
+    tensorboard_log_test(meters, mode, epoch, writer)
     writer.add_scalar(mode+'_loss/disparity_loss', meters['disparity_losses'].avg, epoch)
     writer.add_scalar(mode+'_loss/ranking_loss_uniform', meters['ranking_losses_uniform'].avg, epoch)
     writer.add_scalar(mode+'_score/acc_uniform', meters['acc_uniform'].avg, epoch)
