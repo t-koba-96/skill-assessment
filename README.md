@@ -47,7 +47,6 @@ bash download/download_features.sh
 - [arg_file] for training will be the name before .yaml.   
 (For example, [arg_file] for origin.yaml will be origin)
 
-
 ### Train each task
 
 For training each task independently use [train.py](train.py) as:
@@ -70,13 +69,13 @@ Use Help option (--help) for more info.
 
 To do . [ablationrun.sh](ablationrun.sh)
 
-
 ### Checkpoints
 
 - Model weights  
   - For default, trained model weights are saved to [./ckpt/models](./ckpt/models)
   - Change the save directory if you want by changing the ckpt_path in [arg_file](./args/origin.yaml)
   - The best score is saved as (best_score_ ... .ckpt).
+  - Also the best score results are saved as csv files.  
 
 - Tensorboard logs
   - For default, tensorboard logs are saved to [./ckpt/logs](./ckpt/logs)
@@ -90,7 +89,12 @@ To do . [ablationrun.sh](ablationrun.sh)
 
 ## Evaluate  
 
-To do .
+To do .  
+
+
+## Working File  
+
+- [ex.ipynb](./ex.ipynb)
 
 
 ## References  

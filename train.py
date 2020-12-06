@@ -75,7 +75,7 @@ def main():
     ### attention branch ###
     # → 2branch(pos and neg)
     if args.disparity_loss and args.rank_aware_loss:
-        model_attention = {'pos': None, 'neg': None}
+        model_attention = {'p_att': None, 'n_att': None}
     # → 1branch
     else:
         model_attention = {'att': None}
@@ -191,9 +191,11 @@ def main():
             end_run = early_stop.validate(prec)
             if end_run:
                 print("Valid score did not improve for {} rounds ... earlystopping\n".format(args.earlystopping))
+                Trainer.evaluate(is_best=True)
                 Trainer.writer_close()
                 return
 
+    Trainer.evaluate(is_best=True)
     Trainer.writer_close()
     return
 

@@ -2,6 +2,8 @@ import os
 import time
 import torch
 import glob
+import pandas as pd
+import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 from main.util import AverageMeter, data_augmentation, accuracy, sec2str
@@ -162,13 +164,13 @@ class Train_Runner():
             rank_aware_loss = 0
             # ranking_loss , disparity_loss
             for k in self.att_branches:
-                ranking_loss += self.criterions["ranking"](score_pos[k], score_neg[k], target)
-                disparity_loss += self.criterions["disparity"](all_score_pos[k], all_score_neg[k], uniformscore_pos,
-                                                    uniformscore_neg, target, self.args.m2, self.device, self.args.disparity_loss)
+                ranking_loss += self.criterions["ranking"](score_pos[k], score_neg[k], target) / len(self.att_branches)
+                disparity_loss += self.criterions["disparity"](all_score_pos[k], all_score_neg[k], uniformscore_pos, uniformscore_neg, 
+                                                    target, self.args.m2, self.device, self.args.disparity_loss) / len(self.att_branches)
             ranking_loss_uniform += self.criterions["ranking"](uniformscore_pos, uniformscore_neg, target)
             # rank_aware_loss
             if self.args.rank_aware_loss:
-                rank_aware_loss += self.criterions["disparity"](all_score_pos['pos'], all_score_neg['neg'], uniformscore_pos,
+                rank_aware_loss += self.criterions["disparity"](all_score_pos[list(self.att_branches)[0]], all_score_neg[list(self.att_branches)[1]], uniformscore_pos,
                                                     uniformscore_neg, target, self.args.m3, self.device, self.args.rank_aware_loss)
             # diversity_loss
             if self.args.diversity_loss:
@@ -176,7 +178,7 @@ class Train_Runner():
                 for k in self.att_branches:
                     div_loss_att_pos += self.criterions["diversity"](att_pos[k], self.args, self.device)
                     div_loss_att_neg += self.criterions["diversity"](att_neg[k], self.args, self.device)
-                    diversity_loss += self.args.lambda_param * (div_loss_att_pos + div_loss_att_neg)
+                diversity_loss += self.args.lambda_param * (div_loss_att_pos + div_loss_att_neg) / len(self.att_branches)
 
             # loss update
             all_losses = 0
@@ -239,52 +241,53 @@ class Train_Runner():
             self.models["attention"][k].eval()
 
         # ====== iter ====== 
-        for i, (vid_pos, vid_neg, vid_list) in enumerate(self.dataloaders["valid"]):
-            batch_size = vid_pos.size(0)
-            vid_pos_gpu = vid_pos.to(self.device)
-            vid_neg_gpu = vid_neg.to(self.device)
+        with torch.no_grad():
+            for i, (vid_pos, vid_neg, vid_list) in enumerate(self.dataloaders["valid"]):
+                batch_size = vid_pos.size(0)
+                vid_pos_gpu = vid_pos.to(self.device)
+                vid_neg_gpu = vid_neg.to(self.device)
 
-            # make target label
-            target = torch.ones(batch_size)
-            target = target.to(self.device)
+                # make target label
+                target = torch.ones(batch_size)
+                target = target.to(self.device)
 
-            # calc score, attention
-            all_score_pos, all_score_neg, score_pos, score_neg, att_pos, att_neg = {}, {}, {}, {}, {}, {}
-            final_score_pos = torch.zeros(batch_size).to(self.device)
-            final_score_neg = torch.zeros(batch_size).to(self.device)
-            for k in self.att_branches:
-                all_score_pos[k], att_pos[k] = self.models["attention"][k](vid_pos_gpu)
-                all_score_neg[k], att_neg[k] = self.models["attention"][k](vid_neg_gpu)
-                score_pos[k] = all_score_pos[k].mean(dim=1)
-                score_neg[k] = all_score_neg[k].mean(dim=1)
-                final_score_pos += score_pos[k].data
-                final_score_neg += score_neg[k].data
-
-            # measure accuracy 
-            prec, correct_num = accuracy(final_score_pos, final_score_neg)
-
-            # loss calc
-            ranking_loss = 0
-            diversity_loss = 0
-            all_losses = 0
-            for k in self.att_branches:
-                ranking_loss += self.criterions["ranking"](score_pos[k], score_neg[k], target)
-            all_losses += ranking_loss
-            if self.args.diversity_loss:
-                div_loss_att_pos, div_loss_att_neg = 0, 0
+                # calc score, attention
+                all_score_pos, all_score_neg, score_pos, score_neg, att_pos, att_neg = {}, {}, {}, {}, {}, {}
+                final_score_pos = torch.zeros(batch_size).to(self.device)
+                final_score_neg = torch.zeros(batch_size).to(self.device)
                 for k in self.att_branches:
-                    div_loss_att_pos += self.criterions["diversity"](att_pos[k], self.args, self.device)
-                    div_loss_att_neg += self.criterions["diversity"](att_neg[k], self.args, self.device)
-                diversity_loss += self.args.lambda_param*(div_loss_att_pos + div_loss_att_neg)
-                all_losses += diversity_loss
-            
-            # update records
-            records = {"ranking" : ranking_loss, "diversity" : diversity_loss, "total" : all_losses,
-                       "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
-            Meters.update_validate(records, batch_size, len(self.att_branches))
+                    all_score_pos[k], att_pos[k] = self.models["attention"][k](vid_pos_gpu)
+                    all_score_neg[k], att_neg[k] = self.models["attention"][k](vid_neg_gpu)
+                    score_pos[k] = all_score_pos[k].mean(dim=1)
+                    score_neg[k] = all_score_neg[k].mean(dim=1)
+                    final_score_pos += score_pos[k].data
+                    final_score_neg += score_neg[k].data
 
-            # measure elapsed time
-            begin = time.time()
+                # measure accuracy 
+                prec, correct_num = accuracy(final_score_pos, final_score_neg)
+
+                # loss calc
+                ranking_loss = 0
+                diversity_loss = 0
+                all_losses = 0
+                for k in self.att_branches:
+                    ranking_loss += self.criterions["ranking"](score_pos[k], score_neg[k], target) / len(self.att_branches)
+                all_losses += ranking_loss
+                if self.args.diversity_loss:
+                    div_loss_att_pos, div_loss_att_neg = 0, 0
+                    for k in self.att_branches:
+                        div_loss_att_pos += self.criterions["diversity"](att_pos[k], self.args, self.device)
+                        div_loss_att_neg += self.criterions["diversity"](att_neg[k], self.args, self.device)
+                    diversity_loss += self.args.lambda_param*(div_loss_att_pos + div_loss_att_neg) / len(self.att_branches)
+                    all_losses += diversity_loss
+                
+                # update records
+                records = {"ranking" : ranking_loss, "diversity" : diversity_loss, "total" : all_losses,
+                        "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
+                Meters.update_validate(records, batch_size, len(self.att_branches))
+
+                # measure elapsed time
+                begin = time.time()
 
         # log
         console_log_test(Meters.meters)
@@ -292,6 +295,101 @@ class Train_Runner():
         
         return Meters.meters['acc'].avg
 
+
+
+    def evaluate(self, epoch=10, is_best=False):
+
+        # start epoch
+        begin = time.time()
+
+        # load best epoch model
+        if is_best:
+            print('[Final Evaluate : Using Best Epoch]')
+            csv_name = "best_epoch"
+            self.load_ckpt(is_best=True)
+        # load epoch model
+        else:
+            print('[Final Evaluate : Using Epoch[{}/{}]'.format(epoch, self.args.epochs))
+            csv_name =  str(epoch).zfill(4) + "_epoch"
+            self.load_ckpt(epoch=epoch)
+
+        # model evaluate mode
+        for k in self.att_branches:
+            self.models["attention"][k].eval()
+
+        # csv record
+        score_list = {"pos" : [], "neg" : [], "pos_score" : [], "neg_score" : []}
+        att_list = {}
+        for k in self.att_branches:
+            att_list["pos_"+k] = None
+
+        # ====== iter ====== 
+        with torch.no_grad():
+            for i, (vid_pos, vid_neg, vid_list) in enumerate(self.dataloaders["valid"]):
+                batch_size = vid_pos.size(0)
+                vid_pos_gpu = vid_pos.to(self.device)
+                vid_neg_gpu = vid_neg.to(self.device)
+                score_list["pos"].extend(vid_list["pos"]) 
+                score_list["neg"].extend(vid_list["neg"])
+
+                # calc score, attention
+                all_score_pos, all_score_neg, score_pos, score_neg, att_pos, att_neg = {}, {}, {}, {}, {}, {}
+                final_score_pos = torch.zeros(batch_size).to(self.device)
+                final_score_neg = torch.zeros(batch_size).to(self.device)
+                for k in self.att_branches:
+                    all_score_pos[k], att_pos[k] = self.models["attention"][k](vid_pos_gpu)
+                    all_score_neg[k], att_neg[k] = self.models["attention"][k](vid_neg_gpu)
+                    score_pos[k] = all_score_pos[k].mean(dim=1)
+                    score_neg[k] = all_score_neg[k].mean(dim=1)
+                    att_pos[k] = att_pos[k].mean(dim=2)
+                    att_neg[k] = att_neg[k].mean(dim=2)
+                    if att_list["pos_"+k] is None:
+                        att_list["pos_"+k] = np.squeeze(att_pos[k].cpu().detach().numpy(), 2)
+                        att_list["neg_"+k] = np.squeeze(att_neg[k].cpu().detach().numpy(), 2)
+                    else:
+                        att_list["pos_"+k] = np.concatenate((att_list["pos_"+k], 
+                                                             np.squeeze(att_pos[k].cpu().detach().numpy(), 2)), axis=0)
+                        att_list["neg_"+k] = np.concatenate((att_list["neg_"+k], 
+                                                             np.squeeze(att_neg[k].cpu().detach().numpy(), 2)), axis=0)
+                    final_score_pos += score_pos[k].data
+                    final_score_neg += score_neg[k].data
+                score_list["pos_score"].extend(final_score_pos.cpu().numpy())
+                score_list["neg_score"].extend(final_score_neg.cpu().numpy())
+
+        correct_list = [score_list["pos_score"][i]>score_list["neg_score"][i] for i in range(len(score_list["pos_score"]))]
+
+        # dataframe
+        eval_df = pd.DataFrame({'vid_pos' : score_list["pos"], 
+                                'vid_pos_score' : score_list["pos_score"], 
+                                'vid_neg' : score_list["neg"], 
+                                'vid_neg_score' : score_list["neg_score"], 
+                                'correct' : correct_list
+                            })
+        eval_df.index = np.arange(1,len(score_list["pos_score"])+1)
+        eval_df.to_csv(os.path.join(self.ckptdir, csv_name + "_score.csv"))
+        print('Saving csv file ... {}'.format(csv_name + "_score.csv"))
+
+        for k in att_list:
+            att_df = pd.DataFrame(att_list[k],
+                                index = score_list[k[0:3]]
+            )
+            att_df.columns = np.arange(1,len(att_list[k][0])+1)
+            att_df.to_csv(os.path.join(self.ckptdir, csv_name + "_" + k + ".csv"))
+            print('Saving csv file ... {}'.format(csv_name + "_" + k + ".csv"))
+
+
+    def load_ckpt(self, epoch=10, is_best=False):
+
+        if is_best:
+            weight_path = glob.glob(os.path.join(self.ckptdir, 'best_score*'))[0]
+        else:
+            weight_path = glob.glob(os.path.join(self.ckptdir, 'epoch_' + str(epoch).zfill(4) + '*'))[0]
+        print('Loading checkpoint file ... {}'.format(weight_path))
+        for k in self.att_branches:
+            self.models["attention"][k].load_state_dict(torch.load(weight_path)['state_dict_' + k])
+        print('Loaded model ... epoch : {:04d}  prec_score : {:.4f}'.format(torch.load(weight_path)["epoch"], 
+                                                                            torch.load(weight_path)["prec_score"]))
+        
 
 
     def make_ckpt(self, epoch, prec):
@@ -372,11 +470,11 @@ class UpdateMeters():
         self.meters['batch_time'].update(records["batch_time"])
 
     def update_with_uniform(self, records, batch_size, len_att, phase = 0):
-        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size * len_att)
+        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size)
         self.meters['ranking_losses_uniform'].update(records["ranking_uniform"].item(), batch_size)
-        self.meters['disparity_losses'].update(records["disparity"].item(), batch_size*len_att)
+        self.meters['disparity_losses'].update(records["disparity"].item(), batch_size)
         if self.args.diversity_loss:
-            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size * len_att)
+            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size)
         if self.args.rank_aware_loss:
             self.meters['rank_aware_losses'].update(records["rank_aware"].item(), batch_size)
         if phase == 0:
@@ -392,9 +490,9 @@ class UpdateMeters():
         self.meters['batch_time'].update(records["batch_time"])
 
     def update_validate(self, records, batch_size, len_att):
-        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size * len_att)
+        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size)
         if self.args.diversity_loss:
-            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size * len_att)
+            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size)
         self.meters['losses'].update(records["total"].data.item(), batch_size)
         self.meters['acc'].update(records["acc"], batch_size)
         self.meters['correct'].update(records["correct"])

@@ -3,17 +3,18 @@ import shutil
 import torch
 
 
-def make_dirs(args, opts, train_txt, val_txt, savedir):
+def make_dirs(args, opts, train_txt, val_txt, savedir, mode="train"):
     train_list = os.path.join(args.data_path, opts.dataset, 'splits', opts.task, train_txt)
     valid_list = os.path.join(args.data_path, opts.dataset, 'splits', opts.task, val_txt)
     feature_path = os.path.join(args.data_path, opts.dataset, 'features', opts.task)
     writedir = os.path.join(args.writer_path, savedir)
     ckptdir = os.path.join(args.ckpt_path, savedir)
-    dir_list = [writedir, ckptdir]
-    for dir in dir_list:
-        if os.path.exists(dir):
-            shutil.rmtree(dir)
-        os.makedirs(dir)
+    if mode == "train":
+        dir_list = [writedir, ckptdir]
+        for dir in dir_list:
+            if os.path.exists(dir):
+                shutil.rmtree(dir)
+            os.makedirs(dir)
     return train_list, valid_list, feature_path, writedir, ckptdir
 
 
