@@ -64,10 +64,9 @@ bash run.sh [arg_file] [dataset] [lap_count] [--split(-s) [split for EPIC-Skills
 ```
 
 Use Help option (--help) for more info.  
+- Ablation Study  
 
-### Ablation Study  
 
-To do . [ablationrun.sh](ablationrun.sh)
 
 ### Checkpoints
 
@@ -94,7 +93,7 @@ To do .
 
 ## Working File  
 
-- [ex.ipynb](./ex.ipynb)
+- [test.ipynb](./test.ipynb)
 
 
 ## References  
