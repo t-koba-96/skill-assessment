@@ -14,7 +14,7 @@ Only BEST Dataset available.
 
 ```
 cd data
-python download/download_videos.py BEST/BEST.csv <download_dir> --trim 
+python download/download_videos.py BEST/BEST.csv BEST/videos --trim 
 ```
  
 --trim makes the video trimmed to the part which is only used as the dataset(No background sequenes).

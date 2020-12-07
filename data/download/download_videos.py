@@ -29,6 +29,8 @@ def trim_videos(video_list_df, output_dir):
 def download_vids(video_list_df, output_dir,trim = False):
     errors = []
     task_names = video_list_df.task.unique()
+    if not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
     for task in task_names:
         output_task_dir = os.path.join(output_dir, task)
         if not os.path.isdir(output_task_dir):
