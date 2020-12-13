@@ -13,8 +13,9 @@ from main.util import AverageMeter, data_augmentation, accuracy, sec2str
 
 class Train_Runner():
 
-    def __init__(self, args, device, paths, models, dataloaders, criterions, optimizers):
+    def __init__(self, opts, args, device, paths, models, dataloaders, criterions, optimizers):
 
+        self.opts = opts
         self.args = args
         self.device = device
         self.dataloaders = dataloaders
@@ -297,7 +298,7 @@ class Train_Runner():
 
 
 
-    def evaluate(self, epoch=10, is_best=False):
+    def evaluate(self, epoch=10, is_best=False, write=False):
 
         # start epoch
         begin = time.time()
@@ -306,12 +307,12 @@ class Train_Runner():
         if is_best:
             print('[Final Evaluate : Using Best Epoch]')
             csv_name = "best_epoch"
-            self.load_ckpt(is_best=True)
+            self.load_ckpt(is_best=True, write=write)
         # load epoch model
         else:
             print('[Final Evaluate : Using Epoch[{}/{}]'.format(epoch, self.args.epochs))
             csv_name =  str(epoch).zfill(4) + "_epoch"
-            self.load_ckpt(epoch=epoch)
+            self.load_ckpt(epoch=epoch, write=write)
 
         # model evaluate mode
         for k in self.att_branches:
@@ -378,7 +379,8 @@ class Train_Runner():
             print('Saving csv file ... {}'.format(csv_name + "_" + k + ".csv"))
 
 
-    def load_ckpt(self, epoch=10, is_best=False):
+
+    def load_ckpt(self, epoch=10, is_best=False, write=False):
 
         if is_best:
             weight_path = glob.glob(os.path.join(self.ckptdir, 'best_score*'))[0]
@@ -389,6 +391,8 @@ class Train_Runner():
             self.models["attention"][k].load_state_dict(torch.load(weight_path)['state_dict_' + k])
         print('Loaded model ... epoch : {:04d}  prec_score : {:.4f}'.format(torch.load(weight_path)["epoch"], 
                                                                             torch.load(weight_path)["prec_score"]))
+        if write:
+            self.write_result(torch.load(weight_path)["prec_score"])
         
 
 
@@ -417,6 +421,19 @@ class Train_Runner():
             best_name = os.path.join(self.ckptdir, "best_score_epoch_{:04d}_acc_{:.4f}.ckpt".format(epoch, score))
             torch.save(state, best_name)
             print(('Saving checkpoint file ... best_score_epoch_{:04d}_acc_{:.4f}.ckpt'.format(epoch, score)))
+
+
+
+    def write_result(self, prec):
+        with open(os.path.join(self.args.ckpt_path, self.opts.dataset, self.opts.task, "scores.txt"), mode='a') as a:
+            a.write('[prec_score: {}] : [arg : {}]\n'.format(prec, self.opts.arg+"_lap"+self.opts.lap))
+        with open(os.path.join(self.args.ckpt_path, self.opts.dataset, self.opts.task, "scores.txt"), mode='r') as f:
+            data = f.readlines()
+            data = sorted(data, reverse=True)
+        with open(os.path.join(self.args.ckpt_path, self.opts.dataset, self.opts.task, "scores.txt"), mode='w') as w:
+            for d in data:
+                w.write(d)
+        print("Updated ... {}".format(self.opts.task+"/scores.txt"))
 
 
 

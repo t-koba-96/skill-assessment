@@ -3,8 +3,8 @@ import torch
 def diversity_loss(attention, args, device):
     attention_t = torch.transpose(attention, 1, 2)
     num_features = attention.shape[1]
-    res = torch.matmul(attention_t.view(-1, args.num_filters, num_features), attention.view(-1, num_features, args.num_filters)) - torch.eye(args.num_filters).to(device)
-    res = res.view(-1, args.num_filters*args.num_filters)
+    res = torch.matmul(attention_t.view(-1, args.attention_filters, num_features), attention.view(-1, num_features, args.attention_filters)) - torch.eye(args.attention_filters).to(device)
+    res = res.view(-1, args.attention_filters*args.attention_filters)
     return torch.norm(res, p=2, dim=1).sum() / attention.size(0)
 
 

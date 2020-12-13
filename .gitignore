@@ -9,7 +9,7 @@ args/*
 !args/tcn.yaml
 
 # ckpt
-ckpt/models/* 
+ckpt/results/* 
 ckpt/logs/* 
 
 # checkpoints
@@ -17,7 +17,10 @@ checkpoints/*
 
 # data
 data/BEST/features/*
+data/BEST/frames/*
 data/BEST/videos/*
+data/BEST/vid_frames/*
+data/BEST/new_splits/*
 data/EPIC-Skills/features/*
 
 # runs

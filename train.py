@@ -18,7 +18,7 @@ default == using 'cuda:0'
 
 def get_arguments():
 
-    parser = argparse.ArgumentParser(description='training regression network')
+    parser = argparse.ArgumentParser(description='training network')
     parser.add_argument('arg', type=str, help='arguments file name')
     parser.add_argument('dataset', type=str, help='choose dataset("EPIC-Skills" or "BEST")')
     parser.add_argument('task', type=str, help='choose task(e.g. "drawing" for EPIC-Skills, "origami" for BEST)')
@@ -81,12 +81,12 @@ def main():
         model_attention = {'att': None}
     # attention model
     for k in model_attention.keys():
-        model_attention[k] = RAAN(args, uniform=False, tcn=args.temporal_model)
+        model_attention[k] = RAAN(args, uniform=False)
         model_attention[k] = model_attention[k].to(device)
 
     ### uniform branch ###
     if args.disparity_loss:
-        model_uniform = RAAN(args, uniform=True, tcn=False)
+        model_uniform = RAAN(args, uniform=True)
         model_uniform = model_uniform.to(device)
     else:
         model_uniform = None
@@ -153,7 +153,7 @@ def main():
 
 
     # ====== Train ======
-    Trainer = Train_Runner(args, device, paths, models, dataloaders, criterions, optimizers)
+    Trainer = Train_Runner(opts, args, device, paths, models, dataloaders, criterions, optimizers)
 
     ###  epochs  ###
     best_prec = Trainer.validate(args.start_epoch-1)
@@ -191,11 +191,11 @@ def main():
             end_run = early_stop.validate(prec)
             if end_run:
                 print("Valid score did not improve for {} rounds ... earlystopping\n".format(args.earlystopping))
-                Trainer.evaluate(is_best=True)
+                Trainer.evaluate(is_best=True, write=True)
                 Trainer.writer_close()
                 return
 
-    Trainer.evaluate(is_best=True)
+    Trainer.evaluate(is_best=True, write=True)
     Trainer.writer_close()
     return
 

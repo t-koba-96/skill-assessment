@@ -10,14 +10,14 @@
 
 ### Video Download
 
-Only BEST Dataset available. 
+Only BEST Dataset available.  
 
 ```
 cd data
-python download/download_videos.py BEST/BEST.csv BEST/videos --trim 
+python make_dataset/download_videos.py BEST/BEST.csv BEST/videos --trim 
 ```
  
---trim makes the video trimmed to the part which is only used as the dataset(No background sequenes).
+--trim makes the video trimmed to the part which is only used as the dataset(No background sequenes).  
 
 ### Feature Download
 
@@ -25,7 +25,7 @@ Extracted i3d features for both BEST Dataset and EPIC-Skills .
 
 ```
 cd data
-bash download/download_features.sh 
+bash make_dataset/download_features.sh 
 ```
 
 ###  Splits  
@@ -36,6 +36,15 @@ bash download/download_features.sh
 
 - [EPIC-Skills](./data/EPIC-Skills)
   - [data/EPIC-Skills/splits/<task_name>/<train|test>_split<split_num>.txt] -> Video pairs for each split is divided into files. 
+
+### (Edited 2020/12/8)  
+Because the dataset is based on youtube, some videos are missing after you run download_videos.py. To arrange the splits to your downloaded videos size, run the below code.  
+Also dont forget to set arg[video_sets] to "videos" in the args file.
+
+```
+cd data
+python make_dataset/make_new_splits.py
+```
 
 
 ## Train
@@ -70,8 +79,8 @@ Use Help option (--help) for more info.
 
 ### Checkpoints
 
-- Model weights  
-  - For default, trained model weights are saved to [./ckpt/models](./ckpt/models)
+- Model weights and records
+  - For default, trained model weights & socre records are saved to [./ckpt/results](./ckpt/results)
   - Change the save directory if you want by changing the ckpt_path in [arg_file](./args/origin.yaml)
   - The best score is saved as (best_score_ ... .ckpt).
   - Also the best score results are saved as csv files.  
