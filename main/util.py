@@ -4,22 +4,31 @@ import torch
 
 
 def make_dirs(args, opts, train_txt, val_txt, savedir, mode="train"):
-    if opts.dataset == "EPIC-Skills" or args.video_sets == "whole":
-        splits = 'splits'
-    elif args.video_sets == "videos":
-        splits = 'new_splits'
+    splits , features = '', ''
+    if args.video_sets == 'videos':
+        splits += 'new_'
+    if args.input_feature == '2d':
+        features += 'new_'
+    splits += 'splits'
+    features += 'features'
+
     train_list = os.path.join(args.data_path, opts.dataset, splits, opts.task, train_txt)
     valid_list = os.path.join(args.data_path, opts.dataset, splits, opts.task, val_txt)
-    feature_path = os.path.join(args.data_path, opts.dataset, 'features', opts.task)
+    feature_path = os.path.join(args.data_path, opts.dataset, features, opts.task)
     writedir = os.path.join(args.writer_path, savedir)
     ckptdir = os.path.join(args.ckpt_path, savedir)
+    resultdir = os.path.join(args.result_path, savedir)
+    
     if mode == "train":
         dir_list = [writedir, ckptdir]
-        for dir in dir_list:
-            if os.path.exists(dir):
-                shutil.rmtree(dir)
-            os.makedirs(dir)
-    return train_list, valid_list, feature_path, writedir, ckptdir
+    elif mode == "eval":
+        dir_list = [resultdir]
+    for dir in dir_list:
+        if os.path.exists(dir):
+            shutil.rmtree(dir)
+        os.makedirs(dir)
+
+    return train_list, valid_list, feature_path, writedir, ckptdir, resultdir
 
 
 def accuracy(score_pos, score_neg):
@@ -30,10 +39,17 @@ def accuracy(score_pos, score_neg):
     return float(correct.sum())/correct.size(0), int(correct.sum())
 
 
-def data_augmentation(input_var1, input_var2, device):
-    noise = torch.autograd.Variable(torch.normal(torch.zeros(input_var1.size()[1],
-                                                             input_var1.size()[2]),
-                                                 0.01)).to(device)
+def data_augmentation(input_var1, input_var2, args, device):
+    if args.input_feature == '2d':
+        noise = torch.autograd.Variable(torch.normal(torch.zeros(input_var1.size()[1],
+                                                                 input_var1.size()[2],
+                                                                 input_var1.size()[3],
+                                                                 input_var1.size()[4]),
+                                                                 0.01)).to(device)
+    else:
+        noise = torch.autograd.Variable(torch.normal(torch.zeros(input_var1.size()[1],
+                                                                 input_var1.size()[2]),
+                                                                 0.01)).to(device)
     input_var1 = torch.add(input_var1, noise)
     input_var2 = torch.add(input_var2, noise)
     return input_var1, input_var2

@@ -7,24 +7,25 @@ __pycache__
 args/*
 !args/origin.yaml
 !args/tcn.yaml
+!args/new.yaml
 
 # ckpt
 ckpt/results/* 
 ckpt/logs/* 
-
-# checkpoints
-checkpoints/* 
+ckpt/models/*
 
 # data
 data/BEST/features/*
+data/BEST/new_features/*
+data/BEST/new_features_origin/*
 data/BEST/frames/*
 data/BEST/videos/*
 data/BEST/vid_frames/*
 data/BEST/new_splits/*
 data/EPIC-Skills/features/*
 
-# runs
-runs/*
+# demo
+demo/videos/*
 
 # jupyter notebooks
 *.ipynb

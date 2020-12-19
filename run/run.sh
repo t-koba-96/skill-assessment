@@ -7,10 +7,11 @@ usage() {
     echo "This script requires ~."
     echo
     echo "Arguments:"
-    echo "  [arg_file]   [dataset]   [lap]"
+    echo "  [arg_file]  [lap]"
     echo
     echo "Options:"
     echo "  -h, --help"
+    echo "  -d, --dataset [dataset]" 
     echo "  -s, --split [split_num]"
     echo "  -c, --cuda [cuda_num]"
     echo
@@ -24,6 +25,16 @@ do
         -h | --help)
             usage
             exit 1
+            ;;
+        -d | --dataset)
+            if [[ -z "$2" ]] || [[ "$2" =~ ^- ]]; then
+                echo "ERROR: option --dataset(-d) requires an argument [dataset]" 1>&2
+                echo "Try '$PROGNAME --help(-h)' for more information." 1>&2
+                exit 1
+            fi
+            flg_s="TRUE"
+            var_d=$2
+            shift 2
             ;;
         -s | --split)
             if [[ -z "$2" ]] || [[ "$2" =~ ^- ]]; then
@@ -60,13 +71,13 @@ do
 done
 
 
-if [ ${#args[@]} -ne 3 ]; then
+if [ ${#args[@]} -ne 2 ]; then
     echo "ERROR: incorrect arguments" 1>&2
     echo "Try '$PROGNAME --help(-h)' for more information." 1>&2
     exit 1
-elif [[ ${args[1]} =~ ^BEST ]]; then
+elif [[ $var_d =~ ^BEST ]]; then
     tasks=(apply_eyeliner braid_hair origami scrambled_eggs tie_tie)
-elif [[ ${args[1]} =~ ^EPIC-Skills ]]; then
+elif [[ $var_d =~ ^EPIC-Skills ]]; then
     tasks=(chopstick_using dough_rolling drawing surgery)
 else
     echo "ERROR: incorrect argument [dataset]" 1>&2
@@ -79,22 +90,22 @@ if [ "$flg_s" = "TRUE" ]; then
   if [ "$flg_c" = "TRUE" ]; then
     for task in ${tasks[@]}
       do
-        python train.py ${args[0]} ${args[1]} $task ${args[2]} --split $var_s --cuda $var_c
+        python train.py ${args[0]} $task ${args[1]} --dataset $var_d --split $var_s --cuda $var_c
       done
   else
     for task in ${tasks[@]}
       do
-        python train.py ${args[0]} ${args[1]} $task ${args[2]} --split $var_s
+        python train.py ${args[0]} $task ${args[1]} --dataset $var_d --split $var_s
       done
   fi
 elif [ "$flg_c" = "TRUE" ]; then
   for task in ${tasks[@]}
     do
-      python train.py ${args[0]} ${args[1]} $task ${args[2]} --cuda $var_c
+      python train.py ${args[0]} $task ${args[1]} --dataset $var_d --cuda $var_c
     done
 else
   for task in ${tasks[@]}
     do
-      python train.py ${args[0]} ${args[1]} $task ${args[2]}
+      python train.py ${args[0]} $task ${args[1]} --dataset $var_d
     done
 fi

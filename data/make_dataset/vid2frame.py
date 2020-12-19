@@ -33,7 +33,7 @@ def main():
         for i, (dir, name) in enumerate(zip(vid_paths, vid_name)):
             n_frames = video_2_frames(video_dir = dir, video_name = name, save_dir = os.path.join(args.save_dir, task), 
                             frame_format = args.frame_format, frame_name_num = args.frame_name_num)
-            print('Saved {}.mp4 ({}/{}) Total Frame : {}'.format(os.path.join(args.save_dir, task, name), i+1, vid_len, n_frames))
+            print('Saved {}.mp4 ({}/{}) Total Frame : {}'.format(os.path.join(name), i+1, vid_len, n_frames))
 
         print('\n')
             

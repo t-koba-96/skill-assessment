@@ -16,16 +16,19 @@ class FeatureRecord(object):
         return self._data[1]
 
 class SkillDataSet(data.Dataset):
-    def __init__(self, root_path, list_file, ftr_tmpl='{}_{}.npz'):
+    def __init__(self, root_path, list_file, input_feature="3d"):
 
         self.root_path = root_path
         self.list_file = list_file
-        self.ftr_tmpl = ftr_tmpl
+        self.input_feature = input_feature
 
         self._parse_list()
 
     def _load_features(self, vid):
-        features = np.load(os.path.join(self.root_path, self.ftr_tmpl.format(vid,'rgb')))['arr_0'].astype(np.float32)
+        if self.input_feature == "1d":
+            features = np.load(os.path.join(self.root_path, "{}_{}.npz".format(vid,'rgb')))['arr_0'].astype(np.float32)
+        else:
+            features = np.load(os.path.join(self.root_path, "{}.npy".format(vid))).astype(np.float32)
         return features
 
     def _parse_list(self):
@@ -45,6 +48,18 @@ class SkillDataSet(data.Dataset):
 
     def __len__(self):
         return len(self.pair_list)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class FeatureRecordSingle(object):

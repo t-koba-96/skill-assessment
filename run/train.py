@@ -18,12 +18,12 @@ default == using 'cuda:0'
 
 def get_arguments():
 
-    parser = argparse.ArgumentParser(description='training network')
+    parser = argparse.ArgumentParser(description='Train network')
     parser.add_argument('arg', type=str, help='arguments file name')
-    parser.add_argument('dataset', type=str, help='choose dataset("EPIC-Skills" or "BEST")')
     parser.add_argument('task', type=str, help='choose task(e.g. "drawing" for EPIC-Skills, "origami" for BEST)')
     parser.add_argument('lap', type=str, help='train lap name(count)')
-    parser.add_argument('--split', type=str, default= '1', help='for EPIC-Skills')
+    parser.add_argument('--dataset', type=str, default= 'BEST', help='choose dataset [ EPIC-Skills | BEST ] ')
+    parser.add_argument('--split', type=str, default= '1', help='Splits for EPIC-Skills')
     parser.add_argument('--cuda', type=str, default= [0], help='choose cuda num')
     return parser.parse_args()
 
@@ -40,6 +40,8 @@ def main():
     # yaml args
     args = Dict(yaml.safe_load(open(os.path.join('args',opts.arg+'.yaml'))))
     args.start_time = start_time
+    input_size = {"1d": 1024, "2d": 512}
+    args.input_size = input_size[args.input_feature]
     # show args 
     print(('\n''[Options]\n''{0}\n''\n'
            '[Arguements]\n''{1}\n''\n'.format(opts, args)))
@@ -65,7 +67,7 @@ def main():
         savedir = os.path.join(opts.dataset, opts.task, opts.arg, opts.split, "lap_"+opts.lap)
 
     # paths dict
-    train_list, valid_list, feature_path, writedir, ckptdir = make_dirs(args, opts, train_txt, val_txt, savedir)
+    train_list, valid_list, feature_path, writedir, ckptdir, _ = make_dirs(args, opts, train_txt, val_txt, savedir)
     paths = {'train_list': train_list, 'valid_list': valid_list, 
              'feature_path': feature_path, 'writedir': writedir, 'ckptdir': ckptdir}
 
@@ -99,7 +101,7 @@ def main():
     # ====== Dataloaders ======
     # train_data = train_vid_list.txt 
     train_loader = torch.utils.data.DataLoader(
-        SkillDataSet(paths["feature_path"], paths["train_list"], ftr_tmpl='{}_{}.npz'),
+        SkillDataSet(paths["feature_path"], paths["train_list"], input_feature=args.input_feature),
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.workers,
@@ -107,7 +109,7 @@ def main():
 
     # validation_data = test_vid_list.txt
     valid_loader = torch.utils.data.DataLoader(
-        SkillDataSet(paths["feature_path"], paths["valid_list"], ftr_tmpl='{}_{}.npz'),
+        SkillDataSet(paths["feature_path"], paths["valid_list"], input_feature=args.input_feature),
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.workers,
@@ -169,7 +171,6 @@ def main():
             phase = Trainer.train_with_uniform(epoch, phase=phase)
         else:
             Trainer.train_without_uniform(epoch)
-        print('\n')
 
         # valid
         if epoch % args.eval_freq == 0 or epoch == args.epochs:
@@ -191,11 +192,11 @@ def main():
             end_run = early_stop.validate(prec)
             if end_run:
                 print("Valid score did not improve for {} rounds ... earlystopping\n".format(args.earlystopping))
-                Trainer.evaluate(is_best=True, write=True)
+                Trainer.record_score(is_best=True)
                 Trainer.writer_close()
                 return
 
-    Trainer.evaluate(is_best=True, write=True)
+    Trainer.record_score(is_best=True)
     Trainer.writer_close()
     return
 
