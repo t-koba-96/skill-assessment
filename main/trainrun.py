@@ -217,7 +217,7 @@ class Train_Runner():
                         "disparity" : disparity_loss, "rank_aware" : rank_aware_loss , "diversity" : diversity_loss, 
                         "total" : all_losses, "acc" : prec, "acc_uniform" : prec_uniform,
                         "correct" : correct_num, "batch_time" : time.time() - begin }
-                Meters.update_with_uniform(records, batch_size, len(self.att_branches), phase = phase)
+                Meters.update_with_uniform(records, batch_size, phase = phase)
 
                 # measure elapsed time
                 begin = time.time()
@@ -293,7 +293,7 @@ class Train_Runner():
                     # update records
                     records = {"ranking" : ranking_loss, "diversity" : diversity_loss, "total" : all_losses,
                             "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
-                    Meters.update_validate(records, batch_size, len(self.att_branches))
+                    Meters.update_validate(records, batch_size)
 
                     # measure elapsed time
                     begin = time.time()
@@ -401,49 +401,50 @@ class earlystopping():
 class UpdateMeters():
     def __init__(self, args):
         self.meters = {'batch_time': AverageMeter(), 'fin_num': AverageMeter(), 
-                       'losses': AverageMeter(), 'phase0_loss': AverageMeter(), 'phase1_loss': AverageMeter(),
-                       'ranking_losses': AverageMeter(), 'ranking_losses_uniform': AverageMeter(),
-                       'diversity_losses': AverageMeter(), 'disparity_losses': AverageMeter(),
-                       'rank_aware_losses': AverageMeter(), 'correct': AverageMeter(), 
+                       'total_loss': AverageMeter(), 'phase0_loss': AverageMeter(), 'phase1_loss': AverageMeter(),
+                       'ranking': AverageMeter(), 'ranking_uniform': AverageMeter(),
+                       'diversity': AverageMeter(), 'disparity': AverageMeter(),
+                       'rank_aware': AverageMeter(), 'correct': AverageMeter(), 
                        'acc': AverageMeter(), 'acc_uniform': AverageMeter()}
+
         self.args = args
     
     def update_without_uniform(self, records, batch_size):
-        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size)
+        self.meters['ranking'].update(records["ranking"].item(), batch_size)
         if self.args.diversity_loss:
-            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size)
-        self.meters['losses'].update(records["total"].data.item(), batch_size)
+            self.meters['diversity'].update(records["diversity"].data.item(), batch_size)
+        self.meters['total_loss'].update(records["total_loss"].data.item(), batch_size)
         self.meters['acc'].update(records["acc"], batch_size)
         self.meters['correct'].update(records["correct"])
         self.meters['fin_num'].update(batch_size)
         self.meters['batch_time'].update(records["batch_time"])
 
-    def update_with_uniform(self, records, batch_size, len_att, phase = 0):
-        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size)
-        self.meters['ranking_losses_uniform'].update(records["ranking_uniform"].item(), batch_size)
-        self.meters['disparity_losses'].update(records["disparity"].item(), batch_size)
+    def update_with_uniform(self, records, batch_size, phase = 0):
+        self.meters['ranking'].update(records["ranking"].item(), batch_size)
+        self.meters['ranking_uniform'].update(records["ranking_uniform"].item(), batch_size)
+        self.meters['disparity'].update(records["disparity"].item(), batch_size)
         if self.args.diversity_loss:
-            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size)
+            self.meters['diversity'].update(records["diversity"].data.item(), batch_size)
         if self.args.rank_aware_loss:
-            self.meters['rank_aware_losses'].update(records["rank_aware"].item(), batch_size)
+            self.meters['rank_aware'].update(records["rank_aware"].item(), batch_size)
         if phase == 0:
-            self.meters['phase1_loss'].update(records["total"].data.item(), batch_size)
+            self.meters['phase1_loss'].update(records["total_loss"].data.item(), batch_size)
             self.meters['phase0_loss'].reset_val()
         elif phase == 1:
-            self.meters['phase0_loss'].update(records["total"].data.item(), batch_size)
+            self.meters['phase0_loss'].update(records["total_loss"].data.item(), batch_size)
             self.meters['phase1_loss'].reset_val()
-        self.meters['losses'].update(records["total"].data.item(), batch_size)
+        self.meters['total_loss'].update(records["total_loss"].data.item(), batch_size)
         self.meters['acc'].update(records["acc"], batch_size)
         self.meters['acc_uniform'].update(records["acc_uniform"], batch_size)
         self.meters['correct'].update(records["correct"])
         self.meters['fin_num'].update(batch_size)
         self.meters['batch_time'].update(records["batch_time"])
 
-    def update_validate(self, records, batch_size, len_att):
-        self.meters['ranking_losses'].update(records["ranking"].item(), batch_size)
+    def update_validate(self, records, batch_size):
+        self.meters['ranking'].update(records["ranking"].item(), batch_size)
         if self.args.diversity_loss:
-            self.meters['diversity_losses'].update(records["diversity"].data.item(), batch_size)
-        self.meters['losses'].update(records["total"].data.item(), batch_size)
+            self.meters['diversity'].update(records["diversity"].data.item(), batch_size)
+        self.meters['total_loss'].update(records["total_loss"].data.item(), batch_size)
         self.meters['acc'].update(records["acc"], batch_size)
         self.meters['correct'].update(records["correct"])
         self.meters['fin_num'].update(batch_size)

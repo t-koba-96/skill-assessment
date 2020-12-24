@@ -72,7 +72,7 @@ def load_video(task, vid_name, origin = False):
 def load_result(task, vid_name, pos_neg, params):
     # Load the dataframe
     if params.rank_aware_loss:
-        csv = "best_epoch_pos_p_att.csv"
+        csv = "best_epoch_p_att.csv"
     else:
         csv = "best_epoch_att.csv"
     data_path = os.path.join(args.result_path, task, args.arg, "lap_"+args.lap, csv)
