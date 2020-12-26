@@ -26,8 +26,8 @@ app.config['suppress_callback_exceptions'] = True
 
 # ============================ Variables ===============================
 
-arglist = [os.path.basename(os.path.dirname(x)) for x in glob.glob('{}/apply_eyeliner/*/{}*'.format('ckpt/results/BEST', 'lap_'))]
-laplist = [os.path.basename(x)[-1] for x in glob.glob('{}/*/*/{}*'.format('ckpt/results/BEST', 'lap_'))]
+arglist = [os.path.basename(os.path.dirname(x)) for x in glob.glob('{}/*/{}*/apply_eyeliner'.format('demo/results', 'lap_'))]
+laplist = [os.path.basename(x)[-2] for x in glob.glob('{}/*/{}*/*'.format('demo/results', 'lap_'))]
 arglaplist = []
 for arg, lap in zip(arglist, laplist):
     arglaplist.append(arg+"/lap_"+lap)
@@ -50,7 +50,7 @@ colors = {
 
 def get_arguments():
     parser = argparse.ArgumentParser(description='demo for skill-assessment')
-    parser.add_argument('--result_path', type=str, default='ckpt/results/BEST', help='results file name')
+    parser.add_argument('--result_path', type=str, default='demo/results', help='results file name')
     parser.add_argument('--datalist_path', type=str, default='data/BEST/new_splits', help='datalist path')
     parser.add_argument('--debug', action='store_true', help='debug True or not')
     return parser.parse_args()

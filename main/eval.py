@@ -9,10 +9,10 @@ from addict import Dict
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from main.util import make_dirs
-from main.dataset import SkillDataSet
-from main.model import RAAN
-from main.evalrun import Eval_Runner
+from src.util import make_dirs
+from src.dataset import SkillDataSet
+from src.model import RAAN
+from src.evalrun import Eval_Runner
 
 '''
 default == using 'cuda:0'
@@ -22,12 +22,15 @@ def get_arguments():
 
     parser = argparse.ArgumentParser(description='Evaluation network')
     parser.add_argument('arg', type=str, help='arguments file name')
-    parser.add_argument('task', type=str, help='choose task(e.g. "drawing" for EPIC-Skills, "origami" for BEST)')
+    parser.add_argument('task', type=str, help='choose task[apply_eyeliner | braid_hair | origami | scrambled_egg | tie_tie]')
     parser.add_argument('lap', type=str, help='train lap name(count)')
     parser.add_argument('--epoch', type=str, default='best', help='Model weight [best | epoch_num ] ')
-    parser.add_argument('--dataset', type=str, default='BEST', help='choose dataset [ EPIC-Skills | BEST ] ')
-    parser.add_argument('--split', type=str, default= '1', help='for EPIC-Skills')
     parser.add_argument('--cuda', type=str, default= [0], help='choose cuda num')
+    # Dirs
+    parser.add_argument('--root_dir', type=str, default= "results", help='dir for args')
+    parser.add_argument('--data_dir', type=str, default= "../../local/dataset/skill", help='dir for dataset')
+    parser.add_argument('--result_dir', type=str, default= "results", help='dir for result')
+    parser.add_argument('--demo_dir', type=str, default= "demo", help='dir for demo')
     return parser.parse_args()
 
 
@@ -41,7 +44,7 @@ def main():
     # parser args
     opts = get_arguments()
     # yaml args
-    args = Dict(yaml.safe_load(open(os.path.join('args',opts.arg+'.yaml'))))
+    args = Dict(yaml.safe_load(open(os.path.join(opts.root_dir ,opts.arg, 'arg.yaml'))))
     args.start_time = start_time
     input_size = {"1d": 1024, "2d": 512}
     args.input_size = input_size[args.input_feature]
@@ -56,23 +59,10 @@ def main():
 
 
     # ====== Paths ======
-    # BEST dataset
-    if opts.dataset == "BEST":
-        train_txt = "train.txt"
-        val_txt = "test.txt"
-        savedir = os.path.join(opts.dataset, opts.task, opts.arg, "lap_"+opts.lap)
-
-    # Epic-skills dataset
-    elif opts.dataset == "EPIC-Skills":
-        train_txt = "train_split" + opts.split + ".txt"
-        val_txt = "test_split" + opts.split + ".txt"
-        savedir = os.path.join(opts.dataset, opts.task, opts.arg, opts.split, "lap_"+opts.lap)
-
+    train_list, valid_list, feature_path, resultdir, demodir = make_dirs(args, opts, mode="eval")
     # paths dict
-    train_list, valid_list, feature_path, writedir, ckptdir, resultdir = make_dirs(args, opts, 
-                                                                            train_txt, val_txt, savedir, mode="eval")
     paths = {'train_list': train_list, 'valid_list': valid_list, 'feature_path': feature_path, 
-                                 'writedir': writedir, 'ckptdir': ckptdir, 'resultdir': resultdir}
+                                 'resultdir': resultdir, 'demodir': demodir}
 
 
     # ====== Model ======

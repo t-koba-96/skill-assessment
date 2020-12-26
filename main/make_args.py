@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from typing import Any, Dict, List, Tuple
 
-from args.args import Config
+from src.args import Config, get_config
 
 
 def str2bool(val: str) -> bool:
@@ -26,48 +26,21 @@ def str2bool(val: str) -> bool:
 
 
 def get_arguments() -> argparse.Namespace:
-    """parse all the arguments from command line inteface return a list of
-    parsed arguments."""
+    """parse all the arguments from command line interface return a list of parsed arguments."""
 
     parser = argparse.ArgumentParser(description="make configuration yaml files.")
-
-    parser.add_argument(
-        "--root_dir",
-        type=str,
-        default="./args",
-        help="path to a directory where you want to make config files and directories.",
-    )
+    parser.add_argument('arg_file', type=str, help='choose arg_file([origin.yaml | tcn.yaml | new_origin.yaml | new.yaml])')
+    parser.add_argument("--root_dir", type=str, default="./results", help="path to args file")
 
     fields = dataclasses.fields(Config)
-
     for field in fields:
         type_func = str2bool if field.type is bool else field.type
-
-        if isinstance(field.default, dataclasses._MISSING_TYPE):
-            # default value is not set.
-            # do not specify boolean type in argparse
-            # ref: https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
-            parser.add_argument(
-                f"--{field.name}",
-                type=type_func,
-                nargs="*",
-                required=True,
-            )
-        else:
-            # default value is provided in config dataclass.
-            parser.add_argument(
-                f"--{field.name}",
-                type=type_func,
-                nargs="*",
-                default=field.default,
-            )
+        parser.add_argument(f"--{field.name}", type=type_func, nargs="*", default=None)
 
     return parser.parse_args()
 
 
-def parse_params(
-    args_dict: Dict[str, Any]
-) -> Tuple[Dict[str, Any], List[str], List[List[Any]]]:
+def parse_params(args_dict: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[List[Any]]]:
 
     base_config = {}
     variable_keys = []
@@ -84,11 +57,16 @@ def parse_params(
 
 
 def main() -> None:
+    # get args as dictionary.
     args = get_arguments()
-
-    # convert Namespace to dictionary.
     args_dict = vars(args).copy()
-    del args_dict["root_dir"]
+    del args_dict["arg_file"], args_dict["root_dir"]
+
+    # load all args to args_dict
+    arguements = get_config(os.path.join(args.root_dir, args.arg_file, "arg.yaml")) 
+    for arg in args_dict:
+        if args_dict[arg] is None:
+            args_dict[arg] = dataclasses.asdict(arguements)[arg]
 
     base_config, variable_keys, variable_values = parse_params(args_dict)
 
@@ -104,12 +82,12 @@ def main() -> None:
             param_list.append(f"{k}-{v}")
 
         dir_name = "_".join(param_list)
-        dir_path = os.path.join(args.root_dir, dir_name)
+        dir_path = os.path.join(args.root_dir, args.arg_file + "+" +dir_name)
 
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
 
-        config_path = os.path.join(dir_path, "config.yaml")
+        config_path = os.path.join(dir_path, "arg.yaml")
 
         # save configuration file as yaml
         with open(config_path, "w") as f:

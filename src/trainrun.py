@@ -7,7 +7,7 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from main.util import AverageMeter, data_augmentation, accuracy, sec2str
+from src.util import AverageMeter, data_augmentation, accuracy, sec2str
 
 
 # ====== Runner class ======
@@ -24,8 +24,8 @@ class Train_Runner():
         self.att_branches = self.models["attention"].keys()
         self.criterions = criterions
         self.optimizers = optimizers
-        self.ckptdir = paths["ckptdir"]
-        self.writer = SummaryWriter(paths["writedir"])
+        self.resultdir = paths["resultdir"]
+        self.writer = SummaryWriter(self.resultdir)
 
         self.checkpoint_dict = None
 
@@ -173,12 +173,12 @@ class Train_Runner():
                 for k in self.att_branches:
                     ranking_loss += self.criterions["ranking"](score_pos[k], score_neg[k], target) / len(self.att_branches)
                     disparity_loss += self.criterions["disparity"](all_score_pos[k], all_score_neg[k], uniformscore_pos, uniformscore_neg, 
-                                                        target, self.args.m2, self.device, self.args.disparity_loss) / len(self.att_branches)
+                                                        target, self.args.m2, self.device, self.args.compare_loss_version) / len(self.att_branches)
                 ranking_loss_uniform += self.criterions["ranking"](uniformscore_pos, uniformscore_neg, target)
                 # rank_aware_loss
                 if self.args.rank_aware_loss:
                     rank_aware_loss += self.criterions["disparity"](all_score_pos[list(self.att_branches)[0]], all_score_neg[list(self.att_branches)[1]], uniformscore_pos,
-                                                        uniformscore_neg, target, self.args.m3, self.device, self.args.rank_aware_loss)
+                                                        uniformscore_neg, target, self.args.m3, self.device, self.args.compare_loss_version)
                 # diversity_loss
                 if self.args.diversity_loss:
                     div_loss_att_pos, div_loss_att_neg = 0, 0
@@ -312,9 +312,9 @@ class Train_Runner():
     def record_score(self, epoch=10, is_best=False):
 
         if is_best:
-            weight_path = glob.glob(os.path.join(self.ckptdir, 'best_score*'))[0]
+            weight_path = glob.glob(os.path.join(self.resultdir, 'best_score*'))[0]
         else:
-            weight_path = glob.glob(os.path.join(self.ckptdir, 'epoch_' + str(epoch).zfill(4) + '*'))[0]
+            weight_path = glob.glob(os.path.join(self.resultdir, 'epoch_' + str(epoch).zfill(4) + '*'))[0]
         print('Loading checkpoint file ... {}'.format(weight_path))
         for k in self.att_branches:
             self.models["attention"][k].load_state_dict(torch.load(weight_path)['state_dict_' + k])
@@ -343,25 +343,25 @@ class Train_Runner():
 
         state = self.make_ckpt(epoch, score)
         if ckpt:
-            savefile = os.path.join(self.ckptdir, "epoch_{:04d}_acc_{:.4f}.ckpt".format(epoch, score))
+            savefile = os.path.join(self.resultdir, "epoch_{:04d}_acc_{:.4f}.ckpt".format(epoch, score))
             torch.save(state, savefile)
             print(('Saving checkpoint file ... epoch_{:04d}_acc_{:.4f}.ckpt'.format(epoch, score)))
         if is_best:
-            if glob.glob(os.path.join(self.ckptdir, 'best_score*')):
-                os.remove(glob.glob(os.path.join(self.ckptdir, 'best_score*'))[0])
-            best_name = os.path.join(self.ckptdir, "best_score_epoch_{:04d}_acc_{:.4f}.ckpt".format(epoch, score))
+            if glob.glob(os.path.join(self.resultdir, 'best_score*')):
+                os.remove(glob.glob(os.path.join(self.resultdir, 'best_score*'))[0])
+            best_name = os.path.join(self.resultdir, "best_score_epoch_{:04d}_acc_{:.4f}.ckpt".format(epoch, score))
             torch.save(state, best_name)
             print(('Saving checkpoint file ... best_score_epoch_{:04d}_acc_{:.4f}.ckpt'.format(epoch, score)))
 
 
 
     def write_result(self, prec):
-        with open(os.path.join(self.args.ckpt_path, self.opts.dataset, self.opts.task, "scores.txt"), mode='a') as a:
+        with open(os.path.join(self.opts.result_dir, self.opts.task+"_score_ranking.txt"), mode='a') as a:
             a.write('[prec_score: {}] : [arg : {}]\n'.format(prec, self.opts.arg+"_lap"+self.opts.lap))
-        with open(os.path.join(self.args.ckpt_path, self.opts.dataset, self.opts.task, "scores.txt"), mode='r') as f:
+        with open(os.path.join(self.opts.result_dir, self.opts.task+"_score_ranking.txt"), mode='r') as f:
             data = f.readlines()
             data = sorted(data, reverse=True)
-        with open(os.path.join(self.args.ckpt_path, self.opts.dataset, self.opts.task, "scores.txt"), mode='w') as w:
+        with open(os.path.join(self.opts.result_dir, self.opts.task+"_score_ranking.txt"), mode='w') as w:
             for d in data:
                 w.write(d)
         print("Updated ... {}".format(self.opts.task+"/scores.txt"))

@@ -24,8 +24,8 @@ class Eval_Runner():
         self.dataloader = dataloader
         self.model = model
         self.att_branches = model.keys()
-        self.ckptdir = paths["ckptdir"]
         self.resultdir = paths["resultdir"]
+        self.demodir = paths["demodir"]
 
         self.checkpoint_dict = None
 
@@ -57,10 +57,11 @@ class Eval_Runner():
             self.model[k].eval()
 
         # csv record list
-        vid_name_list = []
         score_list = {"pos" : [], "neg" : [], "pos_score" : [], "neg_score" : []}
+        vid_name_list = {}
         te_att_list = {}
         for k in self.att_branches:
+            vid_name_list[k] = []
             te_att_list[k] = None
 
         # run
@@ -85,10 +86,10 @@ class Eval_Runner():
                             final_score += score[k].data
                             te_att[k] = te_att[k].mean(dim=2)
                             for index, vid_name in enumerate(vid_list[pos_neg]):
-                                if vid_name not in vid_name_list:
+                                if vid_name not in vid_name_list[k]:
                                     pbar.set_postfix({"Video":"{}".format(vid_name)})
                                     te_att_list[k] = self.make_att_result(index, vid_name, k, sp_att[k], te_att[k], te_att_list[k])
-                                    vid_name_list.append(vid_name)
+                                    vid_name_list[k].append(vid_name)
                         score_list[pos_neg+"_score"].extend(final_score.cpu().numpy())
 
                     # progress bar
@@ -104,15 +105,15 @@ class Eval_Runner():
                                 'correct' : correct_list
                             })
         eval_df.index = np.arange(1,len(score_list["pos_score"])+1)
-        eval_df.to_csv(os.path.join(self.resultdir, csv_name + "_score.csv"))
+        eval_df.to_csv(os.path.join(self.demodir, csv_name + "_score.csv"))
         print('Saving csv file ... {}'.format(csv_name + "_score.csv"))
 
         for k in te_att_list:
             att_df = pd.DataFrame(te_att_list[k],
-                                  index = vid_name_list
+                                  index = vid_name_list[k]
             )
             att_df.columns = np.arange(1,len(te_att_list[k][0])+1)
-            att_df.to_csv(os.path.join(self.resultdir, csv_name + "_" + k + ".csv"))
+            att_df.to_csv(os.path.join(self.demodir, csv_name + "_" + k + ".csv"))
             print('Saving csv file ... {}'.format(csv_name + "_" + k + ".csv"))
 
 
@@ -120,9 +121,9 @@ class Eval_Runner():
     def load_ckpt(self, epoch=10, is_best=False):
 
         if is_best:
-            weight_path = glob.glob(os.path.join(self.ckptdir, 'best_score*'))[0]
+            weight_path = glob.glob(os.path.join(self.resultdir, 'best_score*'))[0]
         else:
-            weight_path = glob.glob(os.path.join(self.ckptdir, 'epoch_' + str(epoch).zfill(4) + '*'))[0]
+            weight_path = glob.glob(os.path.join(self.resultdir, 'epoch_' + str(epoch).zfill(4) + '*'))[0]
         print('Loading checkpoint file ... {}'.format(weight_path))
         for k in self.att_branches:
             self.model[k].load_state_dict(torch.load(weight_path)['state_dict_' + k])
@@ -138,14 +139,14 @@ class Eval_Runner():
 
         # spatial attention
         if self.args.spatial_attention:
-            frame_paths = glob.glob(os.path.join(self.args.demo_path, self.opts.task, vid_name, '*'))
-            save_path = os.path.join(self.resultdir, 'video_'+branch, vid_name)
+            frame_paths = glob.glob(os.path.join(self.opts.demo_dir, "videos", self.opts.task, vid_name, '*'))
+            save_path = os.path.join(self.demodir, 'video_'+branch, vid_name)
             if os.path.exists(save_path):
                 shutil.rmtree(save_path) 
             os.makedirs(save_path)
             for i, path in enumerate(frame_paths):
                 blend_img = make_heatmap(sp_att[index,i,0,:,:], path)
-                cv2.imwrite(os.path.join(self.resultdir, 'video_'+branch, vid_name, str(i+1).zfill(5)+'.png'), blend_img)
+                cv2.imwrite(os.path.join(save_path, str(i+1).zfill(5)+'.png'), blend_img)
                 
         # temporal attention
         pooling = nn.AdaptiveAvgPool1d(400)

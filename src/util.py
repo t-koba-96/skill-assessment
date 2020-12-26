@@ -3,7 +3,7 @@ import shutil
 import torch
 
 
-def make_dirs(args, opts, train_txt, val_txt, savedir, mode="train"):
+def make_dirs(args, opts, mode="train"):
     splits , features = '', ''
     if args.video_sets == 'videos':
         splits += 'new_'
@@ -12,23 +12,22 @@ def make_dirs(args, opts, train_txt, val_txt, savedir, mode="train"):
     splits += 'splits'
     features += 'features'
 
-    train_list = os.path.join(args.data_path, opts.dataset, splits, opts.task, train_txt)
-    valid_list = os.path.join(args.data_path, opts.dataset, splits, opts.task, val_txt)
-    feature_path = os.path.join(args.data_path, opts.dataset, features, opts.task)
-    writedir = os.path.join(args.writer_path, savedir)
-    ckptdir = os.path.join(args.ckpt_path, savedir)
-    resultdir = os.path.join(args.result_path, savedir)
-    
+    train_list = os.path.join(opts.data_dir, "BEST", splits, opts.task, "train.txt")
+    valid_list = os.path.join(opts.data_dir, "BEST", splits, opts.task, "test.txt")
+    feature_path = os.path.join(opts.data_dir, "BEST", features, opts.task)
+    resultdir = os.path.join(opts.result_dir, opts.arg, "lap_"+opts.lap, opts.task)
     if mode == "train":
-        dir_list = [writedir, ckptdir]
-    elif mode == "eval":
-        dir_list = [resultdir]
-    for dir in dir_list:
-        if os.path.exists(dir):
-            shutil.rmtree(dir)
-        os.makedirs(dir)
+        demodir = None
+        dir = resultdir
+    if mode == "eval":
+        demodir = os.path.join(opts.demo_dir, "results", opts.arg, "lap_"+opts.lap, opts.task)
+        dir = demodir
 
-    return train_list, valid_list, feature_path, writedir, ckptdir, resultdir
+    if os.path.exists(dir):
+        shutil.rmtree(dir)
+    os.makedirs(dir)
+
+    return train_list, valid_list, feature_path, resultdir, demodir
 
 
 def accuracy(score_pos, score_neg):
