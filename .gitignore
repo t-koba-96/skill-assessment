@@ -14,7 +14,7 @@ data/BEST/new_splits/*
 data/EPIC-Skills/features/*
 
 # results
-results/*
+results/*/*
 !results/apply_eyeliner_score_ranking.txt
 !results/braid_hair_score_ranking.txt
 !results/origami_score_ranking.txt
