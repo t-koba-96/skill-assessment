@@ -55,7 +55,7 @@ To train skill assessment models.
 
 #### Template Args
 
-4 template args(config yaml files) are in [results](./results/) directory.
+4 template args(config yaml files) are in [results](results) directory.
 
 - [origin.yaml](./results/origin/arg.yaml) ... model in the original paper
 - [tcn.yaml](./results/tcn/arg.yaml)  ... temporal model template
