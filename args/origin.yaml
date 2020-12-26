@@ -4,8 +4,10 @@
 # ============================ Path Configs ===============================
 
 data_path: ../../local/dataset/skill         # data path (changed to my setting, default : "./data")
-ckpt_path : ./ckpt/results                   # checkpoint path (save model weight)
+ckpt_path : ./ckpt/models                    # checkpoint path (save model weight)
+result_path : ./ckpt/results                 # checkpoint path (save results)
 writer_path : ./ckpt/logs                    # tensorboard path (save tensorboard)
+demo_path : ./demo/videos                    # demo videos path 
 
 # ============================ Dataset Size ===============================
 
@@ -13,20 +15,25 @@ video_sets: videos                           # ("whole" : whole dataset, "video"
 
 # ============================= Input Features ================================
 
-input_samples : 400                          # feature sample(length)
-input_size : 1024                            # input feature size
+input_feature : 1d                           # ("1d" : 1d(temporal) features, "2d" : 2d(vgg16) spatial features
+input_samples : 400                          # input samples(len) [default : 400]
 
-# ============================= Attention ================================
+# ============================= Spatial Attention ================================
 
-attention_samples : 400                      # samples for temporal attention 
-attention_size : 256                         # output feature size
-attention_filters : 3                        # filters of attention layer
+spatial_attention : False                    # use spatial attention or not
+spatial_attention_f_maps : 512               # spatial_att feature output size
+
+# ============================= Temporal Attention ================================
+
+temporal_attention_samples : 400             # samples for temporal attention 
+temporal_attention_size : 256                # mid layer attention size (does not change feature size)
+temporal_attention_filters : 3               # filters of attention layer
 
 # ============================= Temporal Model ================================
 
 temporal_model : False                       # use temporal model (False or TCN)
 num_layers: 9                                # layer for each tcn stage
-num_f_maps: 512                              # tcn feature output
+num_f_maps: 256                              # tcn feature output size
 
 # ============================= Loss ================================
 

@@ -3,8 +3,11 @@ import yaml
 import torch
 import time
 import os
+import sys
 
 from addict import Dict
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from main.util import make_dirs
 from main.dataset import SkillDataSet

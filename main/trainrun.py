@@ -90,9 +90,9 @@ class Train_Runner():
                 self.optimizers["phase0"].zero_grad()
 
                 # update records
-                records = {"ranking" : ranking_loss, "diversity" : diversity_loss, "total" : all_losses,
-                        "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
-                Meters.update_without_uniform(records, batch_size)
+                records = {"ranking" : ranking_loss.item(), "diversity" : diversity_loss.data.item(), "total_loss" : all_losses.data.item(),
+                           "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
+                Meters.update(records, batch_size)
 
                 # measure elapsed time
                 begin = time.time()
@@ -100,8 +100,8 @@ class Train_Runner():
 
                 # progress bar
                 pbar.update(batch_size)
-                pbar.set_postfix({"Loss":"{:.4f}".format(Meters.meters['losses'].avg), 
-                                  "Acc":"{:.3f}({}/{})".format(Meters.meters['acc'].avg, Meters.meters['correct'].sum, Meters.meters['fin_num'].sum)})
+                pbar.set_postfix({"Loss":"{:.4f}".format(Meters.meters['total_loss'].avg), 
+                                  "Acc":"{:.3f}({}/{})".format(Meters.meters['acc'].avg, Meters.meters['correct'].sum, len(self.dataloaders["train"].dataset))})
 
         # tboard log
         tensorboard_log_train(Meters.meters, 'train', epoch, self.writer) 
@@ -213,11 +213,11 @@ class Train_Runner():
                     phase = 0
         
                 # update records
-                records = {"ranking" : ranking_loss, "ranking_uniform" : ranking_loss_uniform, 
-                        "disparity" : disparity_loss, "rank_aware" : rank_aware_loss , "diversity" : diversity_loss, 
-                        "total" : all_losses, "acc" : prec, "acc_uniform" : prec_uniform,
-                        "correct" : correct_num, "batch_time" : time.time() - begin }
-                Meters.update_with_uniform(records, batch_size, phase = phase)
+                records = {"ranking" : ranking_loss.item(), "ranking_uniform" : ranking_loss_uniform.item(), 
+                           "disparity" : disparity_loss.item(), "rank_aware" : rank_aware_loss.item() , "diversity" : diversity_loss.data.item(), 
+                           "total_loss" : all_losses.data.item(), "acc" : prec, "acc_uniform" : prec_uniform,
+                           "correct" : correct_num, "batch_time" : time.time() - begin }
+                Meters.update(records, batch_size, phase = phase)
 
                 # measure elapsed time
                 begin = time.time()
@@ -225,8 +225,8 @@ class Train_Runner():
 
                 # progress bar
                 pbar.update(batch_size)
-                pbar.set_postfix({"Loss":"{:.4f}".format(Meters.meters['losses'].avg), 
-                                  "Acc":"{:.3f}({}/{})".format(Meters.meters['acc'].avg, Meters.meters['correct'].sum, Meters.meters['fin_num'].sum)})
+                pbar.set_postfix({"Loss":"{:.4f}".format(Meters.meters['total_loss'].avg), 
+                                  "Acc":"{:.3f}({}/{})".format(Meters.meters['acc'].avg, Meters.meters['correct'].sum, len(self.dataloaders["train"].dataset))})
 
         # tboard log
         tensorboard_log_train(Meters.meters, 'train', epoch, self.writer)
@@ -291,17 +291,17 @@ class Train_Runner():
                         all_losses += diversity_loss
                     
                     # update records
-                    records = {"ranking" : ranking_loss, "diversity" : diversity_loss, "total" : all_losses,
-                            "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
-                    Meters.update_validate(records, batch_size)
+                    records = {"ranking" : ranking_loss.item(), "diversity" : diversity_loss.data.item(), "total_loss" : all_losses.data.item(),
+                               "acc" : prec, "correct" : correct_num, "batch_time" : time.time() - begin }
+                    Meters.update(records, batch_size)
 
                     # measure elapsed time
                     begin = time.time()
 
                     # progress bar
                     pbar.update(batch_size)
-                    pbar.set_postfix({"Loss":"{:.4f}".format(Meters.meters['losses'].avg), 
-                                      "Acc":"{:.3f}({}/{})".format(Meters.meters['acc'].avg, Meters.meters['correct'].sum, Meters.meters['fin_num'].sum)})
+                    pbar.set_postfix({"Loss":"{:.4f}".format(Meters.meters['total_loss'].avg), 
+                                      "Acc":"{:.3f}({}/{})".format(Meters.meters['acc'].avg, Meters.meters['correct'].sum, len(self.dataloaders["valid"].dataset))})
 
         # tboard log
         tensorboard_log_test(Meters.meters, 'val', epoch, self.writer)
@@ -396,76 +396,54 @@ class earlystopping():
        return False
 
 
+
 # ====== Update meters ======
 
 class UpdateMeters():
     def __init__(self, args):
-        self.meters = {'batch_time': AverageMeter(), 'fin_num': AverageMeter(), 
-                       'total_loss': AverageMeter(), 'phase0_loss': AverageMeter(), 'phase1_loss': AverageMeter(),
+        self.meters = {'batch_time': AverageMeter(), 'total_loss': AverageMeter(), 
+                       'phase0': AverageMeter(), 'phase1': AverageMeter(),
                        'ranking': AverageMeter(), 'ranking_uniform': AverageMeter(),
                        'diversity': AverageMeter(), 'disparity': AverageMeter(),
                        'rank_aware': AverageMeter(), 'correct': AverageMeter(), 
                        'acc': AverageMeter(), 'acc_uniform': AverageMeter()}
-
+        self.meters_list = ['batch_time', 'correct']
+        self.batch_meters_list = ['ranking', 'ranking_uniform', 'total_loss', 'disparity', 'acc', 'acc_uniform']
+        self.phase_meters_list = ['phase0', 'phase1']
         self.args = args
-    
-    def update_without_uniform(self, records, batch_size):
-        self.meters['ranking'].update(records["ranking"].item(), batch_size)
-        if self.args.diversity_loss:
-            self.meters['diversity'].update(records["diversity"].data.item(), batch_size)
-        self.meters['total_loss'].update(records["total_loss"].data.item(), batch_size)
-        self.meters['acc'].update(records["acc"], batch_size)
-        self.meters['correct'].update(records["correct"])
-        self.meters['fin_num'].update(batch_size)
-        self.meters['batch_time'].update(records["batch_time"])
 
-    def update_with_uniform(self, records, batch_size, phase = 0):
-        self.meters['ranking'].update(records["ranking"].item(), batch_size)
-        self.meters['ranking_uniform'].update(records["ranking_uniform"].item(), batch_size)
-        self.meters['disparity'].update(records["disparity"].item(), batch_size)
-        if self.args.diversity_loss:
-            self.meters['diversity'].update(records["diversity"].data.item(), batch_size)
-        if self.args.rank_aware_loss:
-            self.meters['rank_aware'].update(records["rank_aware"].item(), batch_size)
-        if phase == 0:
-            self.meters['phase1_loss'].update(records["total_loss"].data.item(), batch_size)
-            self.meters['phase0_loss'].reset_val()
-        elif phase == 1:
-            self.meters['phase0_loss'].update(records["total_loss"].data.item(), batch_size)
-            self.meters['phase1_loss'].reset_val()
-        self.meters['total_loss'].update(records["total_loss"].data.item(), batch_size)
-        self.meters['acc'].update(records["acc"], batch_size)
-        self.meters['acc_uniform'].update(records["acc_uniform"], batch_size)
-        self.meters['correct'].update(records["correct"])
-        self.meters['fin_num'].update(batch_size)
-        self.meters['batch_time'].update(records["batch_time"])
-
-    def update_validate(self, records, batch_size):
-        self.meters['ranking'].update(records["ranking"].item(), batch_size)
-        if self.args.diversity_loss:
-            self.meters['diversity'].update(records["diversity"].data.item(), batch_size)
-        self.meters['total_loss'].update(records["total_loss"].data.item(), batch_size)
-        self.meters['acc'].update(records["acc"], batch_size)
-        self.meters['correct'].update(records["correct"])
-        self.meters['fin_num'].update(batch_size)
-        self.meters['batch_time'].update(records["batch_time"])
+    def update(self, records, batch_size, phase = -1):
+        # udpate record
+        for record in records.keys():
+            if record in self.meters_list:
+                self.meters[record].update(records[record])
+            elif record in self.batch_meters_list:
+                self.meters[record].update(records[record], batch_size)
+            elif record == 'diversity':
+                if self.args.diversity_loss:
+                    self.meters[record].update(records[record], batch_size)
+            elif record == 'rank_aware':
+                if self.args.rank_aware_loss:
+                    self.meters[record].update(records[record], batch_size)
+        # update phase loss
+        if phase == 0 or phase == 1:
+            self.meters['phase'+str(phase)].reset_val()
+            self.meters['phase'+str(1-phase)].update(records["total_loss"], batch_size)
 
 
 
 # ====== Tensorboard log ======
 
 def tensorboard_log_test(meters, mode, epoch, writer):
-    writer.add_scalar(mode+'_loss/total_loss', meters['losses'].avg, epoch)
-    writer.add_scalar(mode+'_loss/ranking_loss', meters['ranking_losses'].avg, epoch)
-    writer.add_scalar(mode+'_loss/diversity_loss', meters['diversity_losses'].avg, epoch)
-    writer.add_scalar(mode+'_score/acc', meters['acc'].avg, epoch)
+    tb_items = ['_loss/total_loss', '_loss/ranking_loss', '_loss/diversity_loss', '_score/acc']
+    meter_items = ['total_loss', 'ranking', 'diversity', 'acc']
+    for tb_item, meter_item in zip(tb_items, meter_items):
+        writer.add_scalar(mode+tb_item, meters[meter_item].avg, epoch)
 
 def tensorboard_log_train(meters, mode, epoch, writer):
     tensorboard_log_test(meters, mode, epoch, writer)
-    writer.add_scalar(mode+'_loss/disparity_loss', meters['disparity_losses'].avg, epoch)
-    writer.add_scalar(mode+'_loss/ranking_loss_uniform', meters['ranking_losses_uniform'].avg, epoch)
-    writer.add_scalar(mode+'_score/acc_uniform', meters['acc_uniform'].avg, epoch)
-    writer.add_scalar(mode+'_loss/rank_aware_loss', meters['rank_aware_losses'].avg, epoch)
-    writer.add_scalar(mode+'_loss/phase0(ranking)_loss', meters['phase0_loss'].avg, epoch)
-    writer.add_scalar(mode+'_loss/phase1(other)_loss', meters['phase1_loss'].avg, epoch)
-    
+    tb_items = ['_loss/disparity_loss', '_loss/ranking_loss_uniform', '_score/acc_uniform', 
+                '_loss/rank_aware_loss', '_loss/phase0(ranking)_loss', '_loss/phase1(other)_loss']
+    meter_items = ['disparity', 'ranking_uniform', 'acc_uniform', 'rank_aware', 'phase0', 'phase1']
+    for tb_item, meter_item in zip(tb_items, meter_items):
+        writer.add_scalar(mode+tb_item, meters[meter_item].avg, epoch)

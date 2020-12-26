@@ -18,7 +18,6 @@ usage() {
     exit 1
 }
 
-
 for OPT in "$@"
 do
     case $OPT in
@@ -32,7 +31,7 @@ do
                 echo "Try '$PROGNAME --help(-h)' for more information." 1>&2
                 exit 1
             fi
-            flg_s="TRUE"
+            flg_d="TRUE"
             var_d=$2
             shift 2
             ;;
@@ -75,37 +74,58 @@ if [ ${#args[@]} -ne 2 ]; then
     echo "ERROR: incorrect arguments" 1>&2
     echo "Try '$PROGNAME --help(-h)' for more information." 1>&2
     exit 1
-elif [[ $var_d =~ ^BEST ]]; then
-    tasks=(apply_eyeliner braid_hair origami scrambled_eggs tie_tie)
 elif [[ $var_d =~ ^EPIC-Skills ]]; then
     tasks=(chopstick_using dough_rolling drawing surgery)
 else
-    echo "ERROR: incorrect argument [dataset]" 1>&2
-    echo "Try '$PROGNAME --help(-h)' for more information." 1>&2
-    exit 1
+    tasks=(apply_eyeliner braid_hair origami scrambled_eggs tie_tie)
 fi
 
-
-if [ "$flg_s" = "TRUE" ]; then
-  if [ "$flg_c" = "TRUE" ]; then
+if [ "$flg_d" = "TRUE" ]; then
+  if [ "$flg_s" = "TRUE" ]; then
+    if [ "$flg_c" = "TRUE" ]; then
+      for task in ${tasks[@]}
+        do
+          python run/train.py ${args[0]} $task ${args[1]} --dataset $var_d --split $var_s --cuda $var_c
+        done
+    else
+      for task in ${tasks[@]}
+        do
+          python run/train.py ${args[0]} $task ${args[1]} --dataset $var_d --split $var_s
+        done
+    fi
+  elif [ "$flg_c" = "TRUE" ]; then
     for task in ${tasks[@]}
       do
-        python train.py ${args[0]} $task ${args[1]} --dataset $var_d --split $var_s --cuda $var_c
+        python run/train.py ${args[0]} $task ${args[1]} --dataset $var_d --cuda $var_c
       done
   else
     for task in ${tasks[@]}
       do
-        python train.py ${args[0]} $task ${args[1]} --dataset $var_d --split $var_s
+        python run/train.py ${args[0]} $task ${args[1]} --dataset $var_d
       done
   fi
-elif [ "$flg_c" = "TRUE" ]; then
-  for task in ${tasks[@]}
-    do
-      python train.py ${args[0]} $task ${args[1]} --dataset $var_d --cuda $var_c
-    done
 else
-  for task in ${tasks[@]}
-    do
-      python train.py ${args[0]} $task ${args[1]} --dataset $var_d
-    done
+  if [ "$flg_s" = "TRUE" ]; then
+    if [ "$flg_c" = "TRUE" ]; then
+      for task in ${tasks[@]}
+        do
+          python run/train.py ${args[0]} $task ${args[1]} --split $var_s --cuda $var_c
+        done
+    else
+      for task in ${tasks[@]}
+        do
+          python run/train.py ${args[0]} $task ${args[1]} --split $var_s
+        done
+    fi
+  elif [ "$flg_c" = "TRUE" ]; then
+    for task in ${tasks[@]}
+      do
+        python run/train.py ${args[0]} $task ${args[1]} --cuda $var_c
+      done
+  else
+    for task in ${tasks[@]}
+      do
+        python run/train.py ${args[0]} $task ${args[1]}
+      done
+  fi
 fi
