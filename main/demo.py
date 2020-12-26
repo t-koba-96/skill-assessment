@@ -26,8 +26,9 @@ app.config['suppress_callback_exceptions'] = True
 
 # ============================ Variables ===============================
 
-arglist = [os.path.basename(os.path.dirname(x)) for x in glob.glob('{}/*/{}*/apply_eyeliner'.format('demo/results', 'lap_'))]
-laplist = [os.path.basename(x)[-2] for x in glob.glob('{}/*/{}*/*'.format('demo/results', 'lap_'))]
+args_paths = glob.glob('{}/*/{}*/apply_eyeliner'.format('demo/results', 'lap_'))
+arglist = [os.path.basename(os.path.dirname(x)) for x in args_paths]
+laplist = [os.path.basename(x)[-2] for x in args_paths]
 arglaplist = []
 for arg, lap in zip(arglist, laplist):
     arglaplist.append(arg+"/lap_"+lap)
@@ -49,15 +50,16 @@ colors = {
 # ============================ Defs ===============================
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description='demo for skill-assessment')
-    parser.add_argument('--result_path', type=str, default='demo/results', help='results file name')
-    parser.add_argument('--datalist_path', type=str, default='data/BEST/new_splits', help='datalist path')
+    parser = argparse.ArgumentParser(description='Demo for skill-assessment')
+    parser.add_argument('--root_dir', type=str, default= "results", help='dir for args')
+    parser.add_argument('--result_dir', type=str, default='demo/results', help='results file name')
+    parser.add_argument('--datalist_dir', type=str, default='data/BEST/new_splits', help='datalist path')
     parser.add_argument('--debug', action='store_true', help='debug True or not')
     return parser.parse_args()
 
 # Get Video Path Lists
 def load_path(task):
-    vid_list = [x.strip().split(' ') for x in open(os.path.join(os.getcwd(), args.datalist_path, task, "test.txt"))]
+    vid_list = [x.strip().split(' ') for x in open(os.path.join(os.getcwd(), args.datalist_dir, task, "test.txt"))]
     return vid_list
 
 # Load Video
@@ -65,7 +67,7 @@ def load_video(task, vid_name, origin = False):
     if origin:
         video_path=glob.glob(os.path.join(VIDEOS_PATH ,'demo/videos', task, vid_name))
     else:
-        video_path=glob.glob(os.path.join(VIDEOS_PATH, args.result_path, task, args.arg, "lap_"+args.lap, "video_att", vid_name))
+        video_path=glob.glob(os.path.join(VIDEOS_PATH, args.result_dir, args.arg, "lap_"+args.lap, task, "video_att", vid_name))
     return os.path.join(video_path[0]+"/")
 
 # Load Results
@@ -75,7 +77,7 @@ def load_result(task, vid_name, pos_neg, params):
         csv = "best_epoch_p_att.csv"
     else:
         csv = "best_epoch_att.csv"
-    data_path = os.path.join(args.result_path, task, args.arg, "lap_"+args.lap, csv)
+    data_path = os.path.join(args.result_dir, args.arg, "lap_"+args.lap, task, csv)
     videos_df = pd.read_csv(data_path)
     video_df = videos_df[videos_df["Unnamed: 0"] == vid_name][0:1]
     att_map = video_df[list(str(i) for i in range(1,401))].values
@@ -540,6 +542,6 @@ if __name__ == '__main__':
     args = get_arguments()
     args.arg = arglist[0]
     args.lap = laplist[0]
-    params = Dict(yaml.safe_load(open(os.path.join('args',args.arg+'.yaml'))))
+    params = Dict(yaml.safe_load(open(os.path.join(args.root_dir, 'arg.yaml'))))
     # Run
     app.run_server(debug=args.debug, host='0.0.0.0', port=8888)
