@@ -14,7 +14,12 @@ data/BEST/new_splits/*
 data/EPIC-Skills/features/*
 
 # results
-results*
+results/*
+!results/apply_eyeliner_score_ranking.txt
+!results/braid_hair_score_ranking.txt
+!results/origami_score_ranking.txt
+!results/scrambled_eggs_score_ranking.txt
+!results/tie_tie_score_ranking.txt
 !results/origin/arg.yaml
 !results/tcn/arg.yaml
 !results/new/arg.yaml
