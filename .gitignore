@@ -15,10 +15,10 @@ data/EPIC-Skills/features/*
 
 # results
 results/*
-!args/origin/arg.yaml
-!args/tcn/arg.yaml
-!args/new/arg.yaml
-!args/new_origin/arg.yaml
+!results/origin/arg.yaml
+!results/tcn/arg.yaml
+!results/new/arg.yaml
+!results/new_origin/arg.yaml
 
 # demo
 demo/videos/*
