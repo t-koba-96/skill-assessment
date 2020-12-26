@@ -14,7 +14,7 @@ data/BEST/new_splits/*
 data/EPIC-Skills/features/*
 
 # results
-results/*
+results*
 !results/origin/arg.yaml
 !results/tcn/arg.yaml
 !results/new/arg.yaml
