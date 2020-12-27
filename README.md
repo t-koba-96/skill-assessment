@@ -64,7 +64,7 @@ To train skill assessment models.
 
 #### Make New Args  
 
-To make new features, run [./main/make_arg.py](./main/make_arg.py).  
+To make new arg files, run [./main/make_arg.py](./main/make_arg.py).  
 For example, if you want to change m1 in [new.yaml](./results/new/arg.yaml) to 0.5, run 
 
 ```
@@ -90,7 +90,6 @@ bash main/train_all.sh [arg_file] [lap_num] [--cuda(-c) [gpu_num]]
 ```
 
 Use Help option (--help) for more info.  
-- Ablation Study  
 
 
 

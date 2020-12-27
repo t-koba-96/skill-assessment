@@ -27,11 +27,11 @@ app.config['suppress_callback_exceptions'] = True
 # ============================ Variables ===============================
 
 args_paths = glob.glob('{}/*/{}*/apply_eyeliner'.format('demo/results', 'lap_'))
-arglist = [os.path.basename(os.path.dirname(x)) for x in args_paths]
-laplist = [os.path.basename(x)[-2] for x in args_paths]
+arglist = [os.path.basename(os.path.dirname(os.path.dirname(x))) for x in args_paths]
+laplist = [os.path.basename(os.path.dirname(x)) for x in args_paths]
 arglaplist = []
 for arg, lap in zip(arglist, laplist):
-    arglaplist.append(arg+"/lap_"+lap)
+    arglaplist.append(arg+"/"+lap)
 video_length = 400
 VIDEOS_PATH = os.getcwd()+"/"
 colorscale = [[0, '#0033FF'], [1, '#FF0000']]
@@ -67,7 +67,7 @@ def load_video(task, vid_name, origin = False):
     if origin:
         video_path=glob.glob(os.path.join(VIDEOS_PATH ,'demo/videos', task, vid_name))
     else:
-        video_path=glob.glob(os.path.join(VIDEOS_PATH, args.result_dir, args.arg, "lap_"+args.lap, task, "video_att", vid_name))
+        video_path=glob.glob(os.path.join(VIDEOS_PATH, args.result_dir, arg_name, lap_num, task, "video_att", vid_name))
     return os.path.join(video_path[0]+"/")
 
 # Load Results
@@ -77,7 +77,7 @@ def load_result(task, vid_name, pos_neg, params):
         csv = "best_epoch_p_att.csv"
     else:
         csv = "best_epoch_att.csv"
-    data_path = os.path.join(args.result_dir, args.arg, "lap_"+args.lap, task, csv)
+    data_path = os.path.join(args.result_dir, arg_name, lap_num, task, csv)
     videos_df = pd.read_csv(data_path)
     video_df = videos_df[videos_df["Unnamed: 0"] == vid_name][0:1]
     att_map = video_df[list(str(i) for i in range(1,401))].values
@@ -467,9 +467,9 @@ def serve_image(image_path):
              [Input("weight-selection", "value"),
                Input("image-toggle", "value")])
 def update_spatial_attention(value, origin):  
-    args.arg = arglist[value]
-    args.lap = laplist[value]
-    params = Dict(yaml.safe_load(open(os.path.join('args',args.arg+'.yaml'))))
+    arg_name = arglist[value]
+    lap_num = laplist[value]
+    params = Dict(yaml.safe_load(open(os.path.join(args.root_dir, arg_name, 'arg.yaml'))))
     if not params.spatial_attention or origin:
         return True
     else:
@@ -484,7 +484,7 @@ def update_spatial_attention(value, origin):
               State("pair-selection", "value"),
               State("pos_neg-selection", "value")])
 def update_temporal_attention(n_clicks, value, task, pair, pos_neg):
-    params = Dict(yaml.safe_load(open(os.path.join('args',args.arg+'.yaml'))))
+    params = Dict(yaml.safe_load(open(os.path.join(args.root_dir, arg_name, 'arg.yaml'))))
     vid_list = load_path(task)
     vid_name = vid_list[pair][pos_neg]
     att_data = load_result(task, vid_name, pos_neg, params)
@@ -540,8 +540,10 @@ for css in external_css:
 if __name__ == '__main__':
     global args, params
     args = get_arguments()
-    args.arg = arglist[0]
-    args.lap = laplist[0]
-    params = Dict(yaml.safe_load(open(os.path.join(args.root_dir, 'arg.yaml'))))
+    arg_name = arglist[0]
+    lap_num = laplist[0]
+    print(arg_name)
+    print(lap_num)
+    params = Dict(yaml.safe_load(open(os.path.join(args.root_dir, arg_name, 'arg.yaml'))))
     # Run
     app.run_server(debug=args.debug, host='0.0.0.0', port=8888)
