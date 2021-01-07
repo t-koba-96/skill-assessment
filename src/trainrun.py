@@ -168,7 +168,11 @@ class Train_Runner():
                 ranking_loss_uniform = 0
                 diversity_loss = 0
                 disparity_loss = 0
-                rank_aware_loss = 0
+                if self.args.rank_aware_loss:
+                    rank_aware_loss = 0
+                else:
+                    rank_aware_loss = torch.tensor(0)
+
                 # ranking_loss , disparity_loss
                 for k in self.att_branches:
                     ranking_loss += self.criterions["ranking"](score_pos[k], score_neg[k], target) / len(self.att_branches)

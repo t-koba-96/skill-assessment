@@ -9,11 +9,11 @@ def diversity_loss(attention, args, device):
 
 
 def disparity_loss(input_a_1, input_a_2, input_b_1, input_b_2, target, margin, device, version):
-    if version == "v1":
-        inter1, _ = torch.min((input_a_1 - input_a_2), dim=1)
-    elif version == "v2":
-        inter1 = (input_a_1.mean(dim=1) - input_a_2.mean(dim=1))
+    inter1, _ = torch.min((input_a_1 - input_a_2), dim=1)
     inter2 = (input_b_1 - input_b_2)
-    inter = -target * (inter1.view(-1) - inter2.view(-1)) + torch.ones(input_a_1.size(0)).to(device)*margin
+    if version == "v1":
+        inter = -target * (inter1.view(-1) - inter2.view(-1)) + torch.ones(input_a_1.size(0)).to(device)*margin
+    elif version == "v2":
+        inter = -target * (inter1.view(-1) / inter2.view(-1)) + torch.ones(input_a_1.size(0)).to(device)*margin
     losses = torch.max(torch.zeros(input_a_1.size(0)).to(device), inter)
     return losses.sum()/input_a_1.size(0)

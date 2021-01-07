@@ -152,6 +152,7 @@ def main():
 
     ###  epochs  ###
     best_prec = Trainer.validate(args.start_epoch-1)
+    Trainer.save_checkpoint(0, best_prec, ckpt=False, is_best=True)
     print("\n")
     early_stop = earlystopping(args.earlystopping, best_prec)
     val_num = 0

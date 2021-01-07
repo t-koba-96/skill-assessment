@@ -451,6 +451,7 @@ def load_all_videos():
               State("pair-selection", "value"),
               State("pos_neg-selection", "value")])
 def update_image_src(n_clicks, frame, att, task, pair, pos_neg):
+    print(params)
     vid_list = load_path(task)
     video_path = load_video(task, vid_list[pair][pos_neg], origin=att)
     frame_name = str(frame+1).zfill(5) + ".png"
@@ -467,6 +468,7 @@ def serve_image(image_path):
              [Input("weight-selection", "value"),
                Input("image-toggle", "value")])
 def update_spatial_attention(value, origin):  
+    global arg_name, lap_num, params
     arg_name = arglist[value]
     lap_num = laplist[value]
     params = Dict(yaml.safe_load(open(os.path.join(args.root_dir, arg_name, 'arg.yaml'))))
@@ -484,7 +486,6 @@ def update_spatial_attention(value, origin):
               State("pair-selection", "value"),
               State("pos_neg-selection", "value")])
 def update_temporal_attention(n_clicks, value, task, pair, pos_neg):
-    params = Dict(yaml.safe_load(open(os.path.join(args.root_dir, arg_name, 'arg.yaml'))))
     vid_list = load_path(task)
     vid_name = vid_list[pair][pos_neg]
     att_data = load_result(task, vid_name, pos_neg, params)
@@ -538,7 +539,7 @@ for css in external_css:
     app.css.append_css({"external_url": css})
 
 if __name__ == '__main__':
-    global args, params
+    global args
     args = get_arguments()
     arg_name = arglist[0]
     lap_num = laplist[0]

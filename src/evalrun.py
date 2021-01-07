@@ -167,7 +167,7 @@ def normalize_heatmap(x):
     # choose min (0 or smallest scalar)
     min = x.min()
     max = x.max()
-    result = (x-min)/(max-min)
+    result = 1 - (x-min)/(max-min)
     
     return result
 

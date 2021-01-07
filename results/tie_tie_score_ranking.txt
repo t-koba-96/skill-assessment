@@ -1,1 +1,3 @@
+[prec_score: 0.8978494623655914] : [arg : tcn_lap1]
 [prec_score: 0.8655913978494624] : [arg : origin_lap1]
+[prec_score: 0.8064516129032258] : [arg : new_lap1]
